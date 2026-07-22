@@ -4,17 +4,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentic_rag.core.exceptions import DocumentNotFoundError
 from agentic_rag.models import Document, DocumentStatus
+from agentic_rag.repositories.chunk import DocumentChunkRepository
 from agentic_rag.repositories.document import DocumentRepository
+from agentic_rag.services.chunk import TextChunker
 from agentic_rag.services.pdf import PdfExtractionError, PdfExtractor
 
 
 class DocumentService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
-        self.repository = DocumentRepository(session)
+        self.document_repository = DocumentRepository(session)
+        self.chunk_repository = DocumentChunkRepository(session)
 
     async def get_user_document(self, *, document_id: int, owner_id: int) -> Document:
-        document = await self.repository.get_owned_by_id(
+        document = await self.document_repository.get_owned_by_id(
             document_id=document_id,
             owner_id=owner_id,
         )
@@ -25,10 +28,10 @@ class DocumentService:
         return document
 
     async def list_user_documents(self, *, owner_id: int) -> list[Document]:
-        return await self.repository.list_by_owner(owner_id=owner_id)
+        return await self.document_repository.list_by_owner(owner_id=owner_id)
 
     async def create_document_metadata(self, *, owner_id: int, filename: str) -> Document:
-        document = await self.repository.create_document_metadata(
+        document = await self.document_repository.create_document_metadata(
             owner_id=owner_id, filename=filename
         )
         await self.session.commit()
@@ -42,7 +45,7 @@ class DocumentService:
         filename: str,
         path: Path,
     ) -> Document:
-        document = await self.repository.create_document_metadata(
+        document = await self.document_repository.create_document_metadata(
             owner_id=owner_id,
             filename=filename,
             status=DocumentStatus.PROCESSING,
@@ -50,20 +53,24 @@ class DocumentService:
 
         try:
             extracted = PdfExtractor().extract(path=path)
+            chunks_list = TextChunker().chunk_pages(pages=extracted.pages, source=filename)
         except PdfExtractionError:
-            await self.repository.update_processing_result(
-                document=document,
-                status=DocumentStatus.FAILED,
+            await self.document_repository.update_processing_result(
+                document=document, status=DocumentStatus.FAILED
             )
             await self.session.commit()
             await self.session.refresh(document)
             raise
 
-        await self.repository.update_processing_result(
+        await self.chunk_repository.create_chunks(
+            document_id=document.id,
+            chunks_list=chunks_list,
+        )
+        await self.document_repository.update_processing_result(
             document=document,
             status=DocumentStatus.PROCESSED,
-            page_count=extracted.page_count,
-            chunk_count=0,
+            page_count=extracted.original_page_count,
+            chunk_count=len(chunks_list),
         )
         await self.session.commit()
         await self.session.refresh(document)

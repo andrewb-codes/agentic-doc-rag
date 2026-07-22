@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from agentic_rag.db.base import Base
 
 if TYPE_CHECKING:
+    from agentic_rag.models.chunk import DocumentChunk
     from agentic_rag.models.qa_history import QAHistory
     from agentic_rag.models.user import User
 
@@ -50,6 +51,10 @@ class Document(Base):
 
     owner: Mapped[User] = relationship(back_populates="documents")
     qa_history: Mapped[list[QAHistory]] = relationship(
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
+    chunks: Mapped[list[DocumentChunk]] = relationship(
         back_populates="document",
         cascade="all, delete-orphan",
     )

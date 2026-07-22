@@ -12,7 +12,7 @@ class ExtractedPage:
 
 @dataclass(frozen=True)
 class ExtractedPdf:
-    page_count: int
+    original_page_count: int
     pages: list[ExtractedPage]
 
     @property
@@ -53,4 +53,4 @@ class PdfExtractor:
         if not any(page.text for page in pages):
             raise EmptyPdfError("PDF has no extractable text")
 
-        return ExtractedPdf(page_count=page_count, pages=pages)
+        return ExtractedPdf(original_page_count=page_count, pages=pages)

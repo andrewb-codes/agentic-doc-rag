@@ -26,7 +26,7 @@ def test_extract_pdf_text_with_page_numbers(tmp_path: Path) -> None:
 
     extracted = PdfExtractor().extract(path=pdf_path)
 
-    assert extracted.page_count == 2
+    assert extracted.original_page_count == 2
     assert [page.page_number for page in extracted.pages] == [1, 2]
     assert [page.text for page in extracted.pages] == ["First page", "Second page"]
     assert extracted.text == "First page\n\nSecond page"

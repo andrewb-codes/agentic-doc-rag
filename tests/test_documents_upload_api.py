@@ -3,7 +3,10 @@ from pathlib import Path
 import fitz
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 
+from agentic_rag.db.session import AsyncSessionLocal
+from agentic_rag.models import DocumentChunk
 from tests.test_documents_api import internal_headers
 
 
@@ -35,7 +38,34 @@ async def test_upload_pdf_processes_document(client: AsyncClient, tmp_path: Path
     assert body["filename"] == "manual.pdf"
     assert body["status"] == "processed"
     assert body["page_count"] == 1
-    assert body["chunk_count"] == 0
+    assert body["chunk_count"] == 1
+
+
+async def test_upload_pdf_persists_document_chunks(client: AsyncClient, tmp_path: Path) -> None:
+    pdf_path = tmp_path / "manual.pdf"
+    create_pdf(pdf_path)
+
+    with pdf_path.open("rb") as file:
+        response = await client.post(
+            "/documents/upload",
+            headers=internal_headers(),
+            files={"file": ("manual.pdf", file, "application/pdf")},
+        )
+
+    document_id = response.json()["id"]
+
+    async with AsyncSessionLocal() as session:
+        chunks = list(
+            await session.scalars(
+                select(DocumentChunk).where(DocumentChunk.document_id == document_id)
+            )
+        )
+
+    assert len(chunks) == 1
+    assert chunks[0].page == 1
+    assert chunks[0].chunk_index == 0
+    assert chunks[0].text == "PDF text"
+    assert chunks[0].source == "manual.pdf"
 
 
 async def test_upload_rejects_non_pdf_extension(client: AsyncClient, tmp_path: Path) -> None:
