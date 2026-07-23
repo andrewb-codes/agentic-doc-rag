@@ -1,3 +1,4 @@
+from collections.abc import AsyncGenerator
 from typing import Annotated
 
 from fastapi import Depends, Header
@@ -9,6 +10,7 @@ from agentic_rag.db.session import get_db_session
 from agentic_rag.models import User
 from agentic_rag.services.document import DocumentService
 from agentic_rag.services.user import UserService
+from agentic_rag.vectorstores.qdrant import QdrantVectorStore
 
 
 def verify_internal_api_key(
@@ -43,3 +45,15 @@ async def get_current_telegram_user(
         telegram_user_id=telegram_user_id,
         telegram_username=telegram_username,
     )
+
+
+async def get_vector_store() -> AsyncGenerator[QdrantVectorStore]:
+    vector_store = QdrantVectorStore(
+        url=settings.qdrant_url,
+        collection_name=settings.qdrant_collection,
+    )
+
+    try:
+        yield vector_store
+    finally:
+        await vector_store.close()
