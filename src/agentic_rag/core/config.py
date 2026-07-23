@@ -17,6 +17,9 @@ class Settings(BaseSettings):
 
     max_upload_size_bytes: int = 10 * 1024 * 1024
 
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_collection: str = "document_chunks"
+
     backend_cors_origins: str = ""
 
     model_config = SettingsConfigDict(

@@ -15,5 +15,18 @@ services:
       timeout: 3s
       retries: 10
 
+  qdrant:
+    image: qdrant/qdrant:v1.15.0
+    ports:
+      - "127.0.0.1:${QDRANT_PORT:?QDRANT_PORT is required}:6333"
+    volumes:
+      - rag_qdrant_data:/qdrant/storage
+    healthcheck:
+      test: [ "CMD-SHELL", "timeout 3 bash -c '</dev/tcp/localhost/6333'" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   rag_postgres_data:
+  rag_qdrant_data:
