@@ -22,7 +22,11 @@ class DocumentRepository:
         return list(await self.session.scalars(query))
 
     async def create_document_metadata(
-        self, *, owner_id: int, filename: str, status: DocumentStatus = DocumentStatus.PENDING
+        self,
+        *,
+        owner_id: int,
+        filename: str,
+        status: DocumentStatus = DocumentStatus.PENDING,
     ) -> Document:
         document = Document(owner_id=owner_id, filename=filename, status=status)
         self.session.add(document)
