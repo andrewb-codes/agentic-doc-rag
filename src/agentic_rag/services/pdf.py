@@ -45,12 +45,12 @@ class PdfExtractor:
                     for page_index in range(page_count)
                 ]
         except Exception as exc:
-            raise InvalidPdfError("Could not read PDF file") from exc
+            raise InvalidPdfError("could not read pdf file") from exc
 
         if page_count == 0:
-            raise EmptyPdfError("PDF has no pages")
+            raise EmptyPdfError("pdf has no pages")
 
         if not any(page.text for page in pages):
-            raise EmptyPdfError("PDF has no extractable text")
+            raise EmptyPdfError("pdf has no extractable text")
 
         return ExtractedPdf(original_page_count=page_count, pages=pages)

@@ -44,5 +44,5 @@ def test_extract_invalid_pdf_raises_error(tmp_path: Path) -> None:
     pdf_path = tmp_path / "broken.pdf"
     pdf_path.write_bytes(b"not a pdf")
 
-    with pytest.raises(InvalidPdfError, match="Could not read PDF file"):
+    with pytest.raises(InvalidPdfError, match="could not read pdf file"):
         PdfExtractor().extract(path=pdf_path)
