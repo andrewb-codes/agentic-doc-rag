@@ -1,11 +1,6 @@
-from collections.abc import AsyncGenerator
-
 import pytest
-from asgi_lifespan import LifespanManager
-from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 
-from agentic_rag.api.main import app
 from agentic_rag.db.session import AsyncSessionLocal
 
 
@@ -19,15 +14,3 @@ async def clean_db(request: pytest.FixtureRequest) -> None:
             text("TRUNCATE TABLE qa_history, documents, users RESTART IDENTITY CASCADE")
         )
         await session.commit()
-
-
-@pytest.fixture
-async def client() -> AsyncGenerator[AsyncClient]:
-    async with (
-        LifespanManager(app),
-        AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url="http://test",
-        ) as client,
-    ):
-        yield client

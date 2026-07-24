@@ -10,8 +10,8 @@ pytestmark = pytest.mark.no_db
 
 
 async def test_indexing_service_embeds_and_upserts_chunks() -> None:
-    vector_store = AsyncMock()
     embedding_service = FakeEmbeddingService(vector_size=3)
+    vector_store = AsyncMock()
 
     service = DocumentIndexingService(
         embedding_service=embedding_service,

@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from agentic_rag.db.session import AsyncSessionLocal
 from agentic_rag.models import DocumentChunk
-from tests.test_documents_api import internal_headers
+from tests.api.helpers import internal_headers
 
 
 def create_pdf(path: Path, text: str = "PDF text") -> None:
