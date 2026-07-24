@@ -5,9 +5,9 @@ from agentic_rag.repositories.user import UserRepository
 
 
 class UserService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, *, session: AsyncSession) -> None:
         self.session = session
-        self.repository = UserRepository(session)
+        self.repository = UserRepository(session=session)
 
     async def get_or_create_telegram_user(
         self,

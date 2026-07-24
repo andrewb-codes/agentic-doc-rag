@@ -5,7 +5,7 @@ from agentic_rag.services.chunk import TextChunk
 
 
 class DocumentChunkRepository:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, *, session: AsyncSession) -> None:
         self.session = session
 
     async def create_chunks(

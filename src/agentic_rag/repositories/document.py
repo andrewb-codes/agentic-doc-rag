@@ -7,7 +7,7 @@ from agentic_rag.models import Document, DocumentStatus
 
 
 class DocumentRepository:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, *, session: AsyncSession) -> None:
         self.session = session
 
     async def get_owned_by_id(self, *, document_id: int, owner_id: int) -> Document | None:
