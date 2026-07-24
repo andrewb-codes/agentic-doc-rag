@@ -16,7 +16,7 @@ services:
       retries: 10
 
   qdrant:
-    image: qdrant/qdrant:v1.15.0
+    image: qdrant/qdrant:v1.18.0
     ports:
       - "127.0.0.1:${QDRANT_PORT:?QDRANT_PORT is required}:6333"
     volumes:
