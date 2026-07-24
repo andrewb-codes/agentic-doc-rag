@@ -9,6 +9,8 @@ from agentic_rag.core.exceptions import UnauthorizedError
 from agentic_rag.db.session import get_db_session
 from agentic_rag.models import User
 from agentic_rag.services.document import DocumentService
+from agentic_rag.services.embedding import EmbeddingService, FakeEmbeddingService
+from agentic_rag.services.indexing import DocumentIndexingService
 from agentic_rag.services.user import UserService
 from agentic_rag.vectorstores.qdrant import QdrantVectorStore
 
@@ -25,11 +27,43 @@ def get_session(session: Annotated[AsyncSession, Depends(get_db_session)]) -> As
 
 
 def get_user_service(session: Annotated[AsyncSession, Depends(get_session)]) -> UserService:
-    return UserService(session)
+    return UserService(session=session)
 
 
-def get_document_service(session: Annotated[AsyncSession, Depends(get_session)]) -> DocumentService:
-    return DocumentService(session)
+def get_embedding_service() -> EmbeddingService:
+    return FakeEmbeddingService()
+
+
+async def get_vector_store() -> AsyncGenerator[QdrantVectorStore]:
+    vector_store = QdrantVectorStore(
+        url=settings.qdrant_url,
+        collection_name=settings.qdrant_collection,
+    )
+
+    try:
+        yield vector_store
+    finally:
+        await vector_store.close()
+
+
+def get_indexing_service(
+    embedding_service: Annotated[EmbeddingService, Depends(get_embedding_service)],
+    vector_store: Annotated[QdrantVectorStore, Depends(get_vector_store)],
+) -> DocumentIndexingService:
+    return DocumentIndexingService(
+        embedding_service=embedding_service,
+        vector_store=vector_store,
+    )
+
+
+def get_document_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    indexing_service: Annotated[DocumentIndexingService, Depends(get_indexing_service)],
+) -> DocumentService:
+    return DocumentService(
+        session=session,
+        indexing_service=indexing_service,
+    )
 
 
 async def get_current_telegram_user(
@@ -45,15 +79,3 @@ async def get_current_telegram_user(
         telegram_user_id=telegram_user_id,
         telegram_username=telegram_username,
     )
-
-
-async def get_vector_store() -> AsyncGenerator[QdrantVectorStore]:
-    vector_store = QdrantVectorStore(
-        url=settings.qdrant_url,
-        collection_name=settings.qdrant_collection,
-    )
-
-    try:
-        yield vector_store
-    finally:
-        await vector_store.close()

@@ -7,14 +7,21 @@ from agentic_rag.models import Document, DocumentStatus
 from agentic_rag.repositories.chunk import DocumentChunkRepository
 from agentic_rag.repositories.document import DocumentRepository
 from agentic_rag.services.chunk import TextChunker
+from agentic_rag.services.indexing import DocumentIndexingService
 from agentic_rag.services.pdf import PdfExtractionError, PdfExtractor
 
 
 class DocumentService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        *,
+        session: AsyncSession,
+        indexing_service: DocumentIndexingService,
+    ) -> None:
         self.session = session
-        self.document_repository = DocumentRepository(session)
-        self.chunk_repository = DocumentChunkRepository(session)
+        self.document_repository = DocumentRepository(session=session)
+        self.chunk_repository = DocumentChunkRepository(session=session)
+        self.indexing_service = indexing_service
 
     async def get_user_document(self, *, document_id: int, owner_id: int) -> Document:
         document = await self.document_repository.get_owned_by_id(
@@ -62,10 +69,13 @@ class DocumentService:
             await self.session.refresh(document)
             raise
 
-        await self.chunk_repository.create_chunks(
+        chunks = await self.chunk_repository.create_chunks(
             document_id=document.id,
             chunks_list=chunks_list,
         )
+
+        await self.indexing_service.index_chunks(chunks=chunks)
+
         await self.document_repository.update_processing_result(
             document=document,
             status=DocumentStatus.PROCESSED,
