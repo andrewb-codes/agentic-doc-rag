@@ -70,7 +70,10 @@ class QdrantVectorStore:
         )
 
     async def upsert_chunks(
-        self, *, chunks: list[DocumentChunk], embeddings: list[list[float]]
+        self,
+        *,
+        chunks: list[DocumentChunk],
+        embeddings: list[list[float]],
     ) -> None:
         if len(chunks) != len(embeddings):
             raise ValueError("chunks and embeddings must have the same length")
