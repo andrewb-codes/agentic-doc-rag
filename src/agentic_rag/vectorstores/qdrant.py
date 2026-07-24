@@ -6,6 +6,10 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 from agentic_rag.models import DocumentChunk
 
 
+class VectorSizeMismatchError(Exception):
+    pass
+
+
 class QdrantClient(Protocol):
     async def get_collections(self) -> object:
         pass
@@ -46,6 +50,15 @@ class QdrantVectorStore:
         collection_names = {collection.name for collection in collections_response.collections}
 
         if self.collection_name in collection_names:
+            collection = await self.client.get_collection(collection_name=self.collection_name)
+            existing_vector_size = collection.config.params.vectors.size
+
+            if existing_vector_size != vector_size:
+                raise VectorSizeMismatchError(
+                    f"qdrant collection '{self.collection_name}' has vector size "
+                    f"{existing_vector_size}, expected {vector_size}"
+                )
+
             return
 
         await self.client.create_collection(

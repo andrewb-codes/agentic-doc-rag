@@ -5,7 +5,7 @@ import pytest
 from qdrant_client.models import Distance
 
 from agentic_rag.models import DocumentChunk
-from agentic_rag.vectorstores.qdrant import QdrantVectorStore
+from agentic_rag.vectorstores.qdrant import QdrantVectorStore, VectorSizeMismatchError
 
 pytestmark = pytest.mark.no_db
 
@@ -41,6 +41,15 @@ async def test_qdrant_ensure_collection_does_not_create_existing_collection() ->
     client.get_collections = AsyncMock(
         return_value=SimpleNamespace(collections=[SimpleNamespace(name="document_chunks")])
     )
+    client.get_collection = AsyncMock(
+        return_value=SimpleNamespace(
+            config=SimpleNamespace(
+                params=SimpleNamespace(
+                    vectors=SimpleNamespace(size=1536),
+                )
+            )
+        )
+    )
     client.create_collection = AsyncMock()
 
     vector_store = QdrantVectorStore(
@@ -51,7 +60,33 @@ async def test_qdrant_ensure_collection_does_not_create_existing_collection() ->
 
     await vector_store.ensure_collection(vector_size=1536)
 
+    client.get_collection.assert_awaited_once_with(collection_name="document_chunks")
     client.create_collection.assert_not_awaited()
+
+
+async def test_qdrant_ensure_collection_rejects_vector_size_mismatch() -> None:
+    client = AsyncMock()
+    client.get_collections = AsyncMock(
+        return_value=SimpleNamespace(collections=[SimpleNamespace(name="document_chunks")])
+    )
+    client.get_collection = AsyncMock(
+        return_value=SimpleNamespace(
+            config=SimpleNamespace(
+                params=SimpleNamespace(
+                    vectors=SimpleNamespace(size=3),
+                )
+            )
+        )
+    )
+
+    vector_store = QdrantVectorStore(
+        url="http://unused",
+        collection_name="document_chunks",
+        client=client,
+    )
+
+    with pytest.raises(VectorSizeMismatchError, match="has vector size 3, expected 1536"):
+        await vector_store.ensure_collection(vector_size=1536)
 
 
 async def test_qdrant_ensure_collection_creates_missing_collection() -> None:
