@@ -32,8 +32,18 @@ class OpenAIEmbeddingService:
         model: str,
         vector_size: int = 1536,
         client: AsyncOpenAI | None = None,
+        base_url: str | None = None,
     ) -> None:
-        self.client = client if client is not None else AsyncOpenAI(api_key=api_key)
+        self.client = (
+            client
+            if client is not None
+            else AsyncOpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                max_retries=1,
+                timeout=30.0,
+            )
+        )
         self.model = model
         self._vector_size = vector_size
 

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     qdrant_collection: str = "document_chunks"
 
     openai_api_key: str
+    openai_base_url: str | None = None
     openai_embedding_model: str = "text-embedding-3-small"
 
     backend_cors_origins: str = ""
