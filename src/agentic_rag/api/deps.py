@@ -9,7 +9,7 @@ from agentic_rag.core.exceptions import UnauthorizedError
 from agentic_rag.db.session import get_db_session
 from agentic_rag.models import User
 from agentic_rag.services.document import DocumentService
-from agentic_rag.services.embedding import EmbeddingService, FakeEmbeddingService
+from agentic_rag.services.embedding import EmbeddingService, OpenAIEmbeddingService
 from agentic_rag.services.indexing import DocumentIndexingService
 from agentic_rag.services.user import UserService
 from agentic_rag.vectorstores.qdrant import QdrantVectorStore
@@ -31,7 +31,10 @@ def get_user_service(session: Annotated[AsyncSession, Depends(get_session)]) -> 
 
 
 def get_embedding_service() -> EmbeddingService:
-    return FakeEmbeddingService()
+    return OpenAIEmbeddingService(
+        api_key=settings.openai_api_key,
+        model=settings.openai_embedding_model,
+    )
 
 
 async def get_vector_store() -> AsyncGenerator[QdrantVectorStore]:

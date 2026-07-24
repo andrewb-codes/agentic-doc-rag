@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
     qdrant_collection: str = "document_chunks"
 
+    openai_api_key: str
+    openai_embedding_model: str = "text-embedding-3-small"
+
     backend_cors_origins: str = ""
 
     model_config = SettingsConfigDict(
