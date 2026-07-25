@@ -31,3 +31,13 @@ class DocumentChunkResponse(BaseModel):
     chunk_index: int
     text: str
     source: str
+
+
+class DocumentAskRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+class DocumentAskResponse(BaseModel):
+    answer: str
+    chunks: list[DocumentChunkResponse]

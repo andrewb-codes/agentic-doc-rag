@@ -11,9 +11,11 @@ from agentic_rag.models import User
 from agentic_rag.repositories.chunk import DocumentChunkRepository
 from agentic_rag.repositories.document import DocumentRepository
 from agentic_rag.repositories.user import UserRepository
+from agentic_rag.services.answer import AnswerService
 from agentic_rag.services.document import DocumentMetadataService, DocumentProcessingService
 from agentic_rag.services.embedding import EmbeddingService, OpenAIEmbeddingService
 from agentic_rag.services.indexing import DocumentIndexingService
+from agentic_rag.services.llm import OpenAIChatService
 from agentic_rag.services.retrieval import RetrievalService
 from agentic_rag.services.user import UserService
 from agentic_rag.vectorstores.qdrant import QdrantVectorStore
@@ -57,9 +59,9 @@ def get_user_service(
 
 def get_embedding_service() -> EmbeddingService:
     return OpenAIEmbeddingService(
-        api_key=settings.openai_api_key,
-        model=settings.openai_embedding_model,
-        base_url=settings.openai_base_url,
+        api_key=settings.embedding_api_key,
+        model=settings.embedding_model,
+        base_url=settings.embedding_base_url,
     )
 
 
@@ -118,6 +120,25 @@ def get_retrieval_service(
         embedding_service=embedding_service,
         chunk_repository=chunk_repository,
         vector_store=vector_store,
+    )
+
+
+def get_chat_service() -> OpenAIChatService:
+    return OpenAIChatService(
+        api_key=settings.llm_api_key,
+        model=settings.llm_model,
+        max_tokens=settings.llm_max_tokens,
+        base_url=settings.llm_base_url,
+    )
+
+
+def get_answer_service(
+    retrieval_service: Annotated[RetrievalService, Depends(get_retrieval_service)],
+    chat_service: Annotated[OpenAIChatService, Depends(get_chat_service)],
+) -> AnswerService:
+    return AnswerService(
+        retrieval_service=retrieval_service,
+        chat_service=chat_service,
     )
 
 
