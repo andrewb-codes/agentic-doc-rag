@@ -10,7 +10,7 @@ from agentic_rag.db.session import get_db_session
 from agentic_rag.models import User
 from agentic_rag.services.document import DocumentService
 from agentic_rag.services.embedding import EmbeddingService, OpenAIEmbeddingService
-from agentic_rag.services.indexing import DocumentIndexingService
+from agentic_rag.services.indexing import DocumentIndexingService, IndexingService
 from agentic_rag.services.user import UserService
 from agentic_rag.vectorstores.qdrant import QdrantVectorStore
 
@@ -53,7 +53,7 @@ async def get_vector_store() -> AsyncGenerator[QdrantVectorStore]:
 def get_indexing_service(
     embedding_service: Annotated[EmbeddingService, Depends(get_embedding_service)],
     vector_store: Annotated[QdrantVectorStore, Depends(get_vector_store)],
-) -> DocumentIndexingService:
+) -> IndexingService:
     return DocumentIndexingService(
         embedding_service=embedding_service,
         vector_store=vector_store,
@@ -62,7 +62,7 @@ def get_indexing_service(
 
 def get_document_service(
     session: Annotated[AsyncSession, Depends(get_session)],
-    indexing_service: Annotated[DocumentIndexingService, Depends(get_indexing_service)],
+    indexing_service: Annotated[IndexingService, Depends(get_indexing_service)],
 ) -> DocumentService:
     return DocumentService(
         session=session,

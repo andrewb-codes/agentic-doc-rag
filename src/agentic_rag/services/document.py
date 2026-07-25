@@ -7,7 +7,7 @@ from agentic_rag.models import Document, DocumentStatus
 from agentic_rag.repositories.chunk import DocumentChunkRepository
 from agentic_rag.repositories.document import DocumentRepository
 from agentic_rag.services.chunk import TextChunker
-from agentic_rag.services.indexing import DocumentIndexingService
+from agentic_rag.services.indexing import IndexingService
 from agentic_rag.services.pdf import PdfExtractionError, PdfExtractor
 
 
@@ -16,7 +16,7 @@ class DocumentService:
         self,
         *,
         session: AsyncSession,
-        indexing_service: DocumentIndexingService,
+        indexing_service: IndexingService,
     ) -> None:
         self.session = session
         self.document_repository = DocumentRepository(session=session)

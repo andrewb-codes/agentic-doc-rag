@@ -1,6 +1,13 @@
+from typing import Protocol
+
 from agentic_rag.models import DocumentChunk
 from agentic_rag.services.embedding import EmbeddingService
 from agentic_rag.vectorstores.qdrant import QdrantVectorStore
+
+
+class IndexingService(Protocol):
+    async def index_chunks(self, *, chunks: list[DocumentChunk]) -> None:
+        pass
 
 
 class DocumentIndexingService:
