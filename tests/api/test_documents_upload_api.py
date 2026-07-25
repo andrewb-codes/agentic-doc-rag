@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import fitz
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -8,17 +7,7 @@ from sqlalchemy import select
 from agentic_rag.db.session import AsyncSessionLocal
 from agentic_rag.models import DocumentChunk
 from tests.api.helpers import internal_headers
-
-
-def create_pdf(path: Path, text: str = "PDF text") -> None:
-    document = fitz.open()
-    page = document.new_page()
-
-    if text:
-        page.insert_text((72, 72), text)
-
-    document.save(path)
-    document.close()
+from tests.helpers.pdf import create_pdf
 
 
 async def test_upload_pdf_processes_document(client: AsyncClient, tmp_path: Path) -> None:
