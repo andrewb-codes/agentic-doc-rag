@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     llm_api_key: str
     llm_base_url: str | None = None
-    llm_model: str = "gpt-4o-mini"
+    llm_model: str = "gpt-5.4-mini"
     llm_max_tokens: int = 1000
 
     backend_cors_origins: str = ""
