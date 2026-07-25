@@ -32,7 +32,10 @@ class QdrantClient(Protocol):
         pass
 
     async def create_collection(
-        self, *, collection_name: str, vectors_config: VectorParams
+        self,
+        *,
+        collection_name: str,
+        vectors_config: VectorParams,
     ) -> object:
         pass
 
