@@ -174,3 +174,36 @@ async def test_qdrant_upsert_chunks_rejects_mismatched_embeddings_count() -> Non
             chunks=[chunk],
             embeddings=[],
         )
+
+
+async def test_qdrant_search_chunks_returns_chunk_ids_and_scores() -> None:
+    client = AsyncMock()
+    client.query_points = AsyncMock(
+        return_value=SimpleNamespace(
+            points=[
+                SimpleNamespace(payload={"chunk_id": 10}, score=0.91),
+                SimpleNamespace(payload={"chunk_id": 20}, score=0.82),
+            ]
+        )
+    )
+
+    vector_store = QdrantVectorStore(
+        url="http://unused",
+        collection_name="document_chunks",
+        client=client,
+    )
+
+    results = await vector_store.search_chunks(
+        embedding=[0.1, 0.2, 0.3],
+        limit=2,
+    )
+
+    client.query_points.assert_awaited_once_with(
+        collection_name="document_chunks",
+        query=[0.1, 0.2, 0.3],
+        limit=2,
+    )
+    assert [(result.chunk_id, result.score) for result in results] == [
+        (10, 0.91),
+        (20, 0.82),
+    ]

@@ -1,9 +1,16 @@
+from dataclasses import dataclass
 from typing import Protocol
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from agentic_rag.models import DocumentChunk
+
+
+@dataclass(frozen=True)
+class VectorSearchResult:
+    chunk_id: int
+    score: float
 
 
 class VectorSizeMismatchError(Exception):
@@ -20,6 +27,9 @@ class QdrantClient(Protocol):
         pass
 
     async def upsert(self, *, collection_name: str, points: list[PointStruct]) -> object:
+        pass
+
+    async def query_points(self, *, collection_name: str, query: list[float], limit: int) -> object:
         pass
 
     async def close(self) -> None:
@@ -96,6 +106,26 @@ class QdrantVectorStore:
             collection_name=self.collection_name,
             points=points,
         )
+
+    async def search_chunks(
+        self,
+        *,
+        embedding: list[float],
+        limit: int,
+    ) -> list[VectorSearchResult]:
+        response = await self.client.query_points(
+            collection_name=self.collection_name,
+            query=embedding,
+            limit=limit,
+        )
+
+        return [
+            VectorSearchResult(
+                chunk_id=int(point.payload["chunk_id"]),
+                score=float(point.score),
+            )
+            for point in response.points
+        ]
 
     async def close(self) -> None:
         await self.client.close()
