@@ -8,9 +8,13 @@ from agentic_rag.core.config import settings
 from agentic_rag.core.exceptions import UnauthorizedError
 from agentic_rag.db.session import get_db_session
 from agentic_rag.models import User
+from agentic_rag.repositories.chunk import DocumentChunkRepository
+from agentic_rag.repositories.document import DocumentRepository
+from agentic_rag.repositories.user import UserRepository
 from agentic_rag.services.document import DocumentService
 from agentic_rag.services.embedding import EmbeddingService, OpenAIEmbeddingService
-from agentic_rag.services.indexing import DocumentIndexingService, IndexingService
+from agentic_rag.services.indexing import DocumentIndexingService
+from agentic_rag.services.retrieval import RetrievalService
 from agentic_rag.services.user import UserService
 from agentic_rag.vectorstores.qdrant import QdrantVectorStore
 
@@ -26,8 +30,29 @@ def get_session(session: Annotated[AsyncSession, Depends(get_db_session)]) -> As
     return session
 
 
-def get_user_service(session: Annotated[AsyncSession, Depends(get_session)]) -> UserService:
-    return UserService(session=session)
+def get_user_repository(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> UserRepository:
+    return UserRepository(session=session)
+
+
+def get_document_repository(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> DocumentRepository:
+    return DocumentRepository(session=session)
+
+
+def get_chunk_repository(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> DocumentChunkRepository:
+    return DocumentChunkRepository(session=session)
+
+
+def get_user_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    repository: Annotated[UserRepository, Depends(get_user_repository)],
+) -> UserService:
+    return UserService(session=session, repository=repository)
 
 
 def get_embedding_service() -> EmbeddingService:
@@ -53,7 +78,7 @@ async def get_vector_store() -> AsyncGenerator[QdrantVectorStore]:
 def get_indexing_service(
     embedding_service: Annotated[EmbeddingService, Depends(get_embedding_service)],
     vector_store: Annotated[QdrantVectorStore, Depends(get_vector_store)],
-) -> IndexingService:
+) -> DocumentIndexingService:
     return DocumentIndexingService(
         embedding_service=embedding_service,
         vector_store=vector_store,
@@ -62,11 +87,27 @@ def get_indexing_service(
 
 def get_document_service(
     session: Annotated[AsyncSession, Depends(get_session)],
-    indexing_service: Annotated[IndexingService, Depends(get_indexing_service)],
+    document_repository: Annotated[DocumentRepository, Depends(get_document_repository)],
+    chunk_repository: Annotated[DocumentChunkRepository, Depends(get_chunk_repository)],
+    indexing_service: Annotated[DocumentIndexingService, Depends(get_indexing_service)],
 ) -> DocumentService:
     return DocumentService(
         session=session,
+        document_repository=document_repository,
+        chunk_repository=chunk_repository,
         indexing_service=indexing_service,
+    )
+
+
+def get_retrieval_service(
+    embedding_service: Annotated[EmbeddingService, Depends(get_embedding_service)],
+    chunk_repository: Annotated[DocumentChunkRepository, Depends(get_chunk_repository)],
+    vector_store: Annotated[QdrantVectorStore, Depends(get_vector_store)],
+) -> RetrievalService:
+    return RetrievalService(
+        embedding_service=embedding_service,
+        chunk_repository=chunk_repository,
+        vector_store=vector_store,
     )
 
 

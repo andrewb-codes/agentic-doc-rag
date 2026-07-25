@@ -37,7 +37,7 @@ async def test_indexing_service_embeds_and_upserts_chunks() -> None:
         ),
     ]
 
-    await service.index_chunks(chunks=chunks)
+    await service.index_chunks(chunks=chunks, owner_id=1)
 
     vector_store.ensure_collection.assert_awaited_once_with(vector_size=3)
     vector_store.upsert_chunks.assert_awaited_once_with(
@@ -46,4 +46,5 @@ async def test_indexing_service_embeds_and_upserts_chunks() -> None:
             [1.0, 1.0, 1.0],
             [2.0, 2.0, 2.0],
         ],
+        owner_id=1,
     )

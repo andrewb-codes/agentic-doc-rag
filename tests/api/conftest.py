@@ -10,7 +10,7 @@ from agentic_rag.models import DocumentChunk
 
 
 class NoOpIndexingService:
-    async def index_chunks(self, *, chunks: list[DocumentChunk]) -> None:
+    async def index_chunks(self, *, chunks: list[DocumentChunk], owner_id: int) -> None:
         pass
 
 

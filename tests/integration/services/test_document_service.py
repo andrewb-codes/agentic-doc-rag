@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -6,7 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentic_rag.models import DocumentChunk, DocumentStatus
+from agentic_rag.repositories.chunk import DocumentChunkRepository
+from agentic_rag.repositories.document import DocumentRepository
 from agentic_rag.services.document import DocumentService
+from agentic_rag.services.indexing import DocumentIndexingService
 from agentic_rag.services.pdf import InvalidPdfError
 from tests.helpers.pdf import create_pdf
 from tests.integration.helpers import create_user
@@ -15,6 +19,19 @@ from tests.integration.helpers import create_user
 class FakeIndexingService:
     def __init__(self) -> None:
         self.index_chunks = AsyncMock()
+
+
+def create_document_service(
+    *,
+    session: AsyncSession,
+    indexing_service: FakeIndexingService,
+) -> DocumentService:
+    return DocumentService(
+        session=session,
+        document_repository=DocumentRepository(session=session),
+        chunk_repository=DocumentChunkRepository(session=session),
+        indexing_service=cast(DocumentIndexingService, cast(object, indexing_service)),
+    )
 
 
 async def test_document_service_process_uploaded_pdf_persists_document_and_chunks(
@@ -27,7 +44,7 @@ async def test_document_service_process_uploaded_pdf_persists_document_and_chunk
     create_pdf(pdf_path)
 
     indexing_service = FakeIndexingService()
-    service = DocumentService(
+    service = create_document_service(
         session=session,
         indexing_service=indexing_service,
     )
@@ -47,7 +64,7 @@ async def test_document_service_process_uploaded_pdf_persists_document_and_chunk
     assert document.chunk_count == 1
     assert len(chunks) == 1
     assert chunks[0].text == "PDF text"
-    indexing_service.index_chunks.assert_awaited_once_with(chunks=chunks)
+    indexing_service.index_chunks.assert_awaited_once_with(chunks=chunks, owner_id=user.id)
 
 
 async def test_document_service_marks_document_failed_when_pdf_is_invalid(
@@ -59,9 +76,10 @@ async def test_document_service_marks_document_failed_when_pdf_is_invalid(
     pdf_path = tmp_path / "broken.pdf"
     pdf_path.write_bytes(b"not a pdf")
 
-    service = DocumentService(
+    indexing_service = FakeIndexingService()
+    service = create_document_service(
         session=session,
-        indexing_service=FakeIndexingService(),
+        indexing_service=indexing_service,
     )
 
     with pytest.raises(InvalidPdfError):

@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from qdrant_client.models import Distance
+from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue
 
 from agentic_rag.models import DocumentChunk
 from agentic_rag.vectorstores.qdrant import QdrantVectorStore, VectorSizeMismatchError
@@ -132,6 +132,7 @@ async def test_qdrant_upsert_chunks_sends_points_with_payload() -> None:
     await vector_store.upsert_chunks(
         chunks=[chunk],
         embeddings=[[0.1, 0.2, 0.3]],
+        owner_id=1,
     )
 
     client.upsert.assert_awaited_once()
@@ -143,8 +144,9 @@ async def test_qdrant_upsert_chunks_sends_points_with_payload() -> None:
     assert point.id == 10
     assert point.vector == [0.1, 0.2, 0.3]
     assert point.payload == {
-        "chunk_id": 10,
+        "owner_id": 1,
         "document_id": 20,
+        "chunk_id": 10,
         "page": 3,
         "chunk_index": 0,
         "source": "manual.pdf",
@@ -173,6 +175,7 @@ async def test_qdrant_upsert_chunks_rejects_mismatched_embeddings_count() -> Non
         await vector_store.upsert_chunks(
             chunks=[chunk],
             embeddings=[],
+            owner_id=1,
         )
 
 
@@ -195,6 +198,7 @@ async def test_qdrant_search_chunks_returns_chunk_ids_and_scores() -> None:
 
     results = await vector_store.search_chunks(
         embedding=[0.1, 0.2, 0.3],
+        owner_id=1,
         limit=2,
     )
 
@@ -202,6 +206,14 @@ async def test_qdrant_search_chunks_returns_chunk_ids_and_scores() -> None:
         collection_name="document_chunks",
         query=[0.1, 0.2, 0.3],
         limit=2,
+        query_filter=Filter(
+            must=[
+                FieldCondition(
+                    key="owner_id",
+                    match=MatchValue(value=1),
+                )
+            ]
+        ),
     )
     assert [(result.chunk_id, result.score) for result in results] == [
         (10, 0.91),

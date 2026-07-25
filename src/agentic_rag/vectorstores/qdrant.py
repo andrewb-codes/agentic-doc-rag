@@ -2,7 +2,14 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from qdrant_client import AsyncQdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client.models import (
+    Distance,
+    FieldCondition,
+    Filter,
+    MatchValue,
+    PointStruct,
+    VectorParams,
+)
 
 from agentic_rag.models import DocumentChunk
 
@@ -21,6 +28,9 @@ class QdrantClient(Protocol):
     async def get_collections(self) -> object:
         pass
 
+    async def get_collection(self, *, collection_name: str) -> object:
+        pass
+
     async def create_collection(
         self, *, collection_name: str, vectors_config: VectorParams
     ) -> object:
@@ -29,7 +39,14 @@ class QdrantClient(Protocol):
     async def upsert(self, *, collection_name: str, points: list[PointStruct]) -> object:
         pass
 
-    async def query_points(self, *, collection_name: str, query: list[float], limit: int) -> object:
+    async def query_points(
+        self,
+        *,
+        collection_name: str,
+        query: list[float],
+        query_filter: Filter,
+        limit: int,
+    ) -> object:
         pass
 
     async def close(self) -> None:
@@ -84,6 +101,7 @@ class QdrantVectorStore:
         *,
         chunks: list[DocumentChunk],
         embeddings: list[list[float]],
+        owner_id: int,
     ) -> None:
         if len(chunks) != len(embeddings):
             raise ValueError("chunks and embeddings must have the same length")
@@ -93,8 +111,9 @@ class QdrantVectorStore:
                 id=chunk.id,
                 vector=embedding,
                 payload={
-                    "chunk_id": chunk.id,
+                    "owner_id": owner_id,
                     "document_id": chunk.document_id,
+                    "chunk_id": chunk.id,
                     "page": chunk.page,
                     "chunk_index": chunk.chunk_index,
                     "source": chunk.source,
@@ -111,11 +130,22 @@ class QdrantVectorStore:
         self,
         *,
         embedding: list[float],
+        owner_id: int,
         limit: int,
     ) -> list[VectorSearchResult]:
+        query_filter = Filter(
+            must=[
+                FieldCondition(
+                    key="owner_id",
+                    match=MatchValue(value=owner_id),
+                )
+            ]
+        )
+
         response = await self.client.query_points(
             collection_name=self.collection_name,
             query=embedding,
+            query_filter=query_filter,
             limit=limit,
         )
 

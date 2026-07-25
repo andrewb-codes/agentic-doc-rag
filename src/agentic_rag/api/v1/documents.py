@@ -5,19 +5,44 @@ from fastapi import APIRouter, Depends, File, Path, UploadFile, status
 from agentic_rag.api.deps import (
     get_current_telegram_user,
     get_document_service,
+    get_retrieval_service,
 )
-from agentic_rag.api.presenters.documents import build_document_response
+from agentic_rag.api.presenters.documents import (
+    build_document_chunk_response,
+    build_document_response,
+)
 from agentic_rag.api.upload import save_upload_to_temp_file, validate_pdf_upload
 from agentic_rag.core.exceptions import PdfProcessingError
 from agentic_rag.models import User
-from agentic_rag.schemas.document import DocumentCreateRequest, DocumentResponse
+from agentic_rag.schemas.document import (
+    DocumentChunkResponse,
+    DocumentCreateRequest,
+    DocumentResponse,
+    DocumentSearchRequest,
+)
 from agentic_rag.services.document import DocumentService
 from agentic_rag.services.pdf import PdfExtractionError
+from agentic_rag.services.retrieval import RetrievalService
 
 router = APIRouter(
     prefix="/documents",
     tags=["Documents"],
 )
+
+
+@router.post("/search", response_model=list[DocumentChunkResponse])
+async def search_documents(
+    request: DocumentSearchRequest,
+    current_user: Annotated[User, Depends(get_current_telegram_user)],
+    service: Annotated[RetrievalService, Depends(get_retrieval_service)],
+) -> list[DocumentChunkResponse]:
+    chunks = await service.search_user_chunks(
+        query=request.query,
+        owner_id=current_user.id,
+        limit=request.limit,
+    )
+
+    return [build_document_chunk_response(chunk) for chunk in chunks]
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
