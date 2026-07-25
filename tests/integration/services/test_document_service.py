@@ -6,10 +6,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agentic_rag.models import DocumentChunk, DocumentStatus
+from agentic_rag.models import Document, DocumentChunk, DocumentStatus
 from agentic_rag.repositories.chunk import DocumentChunkRepository
 from agentic_rag.repositories.document import DocumentRepository
-from agentic_rag.services.document import DocumentService
+from agentic_rag.services.document import DocumentProcessingService
 from agentic_rag.services.indexing import DocumentIndexingService
 from agentic_rag.services.pdf import InvalidPdfError
 from tests.helpers.pdf import create_pdf
@@ -21,12 +21,12 @@ class FakeIndexingService:
         self.index_chunks = AsyncMock()
 
 
-def create_document_service(
+def create_document_processing_service(
     *,
     session: AsyncSession,
     indexing_service: FakeIndexingService,
-) -> DocumentService:
-    return DocumentService(
+) -> DocumentProcessingService:
+    return DocumentProcessingService(
         session=session,
         document_repository=DocumentRepository(session=session),
         chunk_repository=DocumentChunkRepository(session=session),
@@ -34,7 +34,7 @@ def create_document_service(
     )
 
 
-async def test_document_service_process_uploaded_pdf_persists_document_and_chunks(
+async def test_document_processing_service_process_uploaded_pdf_persists_document_and_chunks(
     session: AsyncSession,
     tmp_path: Path,
 ) -> None:
@@ -44,7 +44,7 @@ async def test_document_service_process_uploaded_pdf_persists_document_and_chunk
     create_pdf(pdf_path)
 
     indexing_service = FakeIndexingService()
-    service = create_document_service(
+    service = create_document_processing_service(
         session=session,
         indexing_service=indexing_service,
     )
@@ -67,7 +67,7 @@ async def test_document_service_process_uploaded_pdf_persists_document_and_chunk
     indexing_service.index_chunks.assert_awaited_once_with(chunks=chunks, owner_id=user.id)
 
 
-async def test_document_service_marks_document_failed_when_pdf_is_invalid(
+async def test_document_processing_service_marks_document_failed_when_pdf_is_invalid(
     session: AsyncSession,
     tmp_path: Path,
 ) -> None:
@@ -77,7 +77,7 @@ async def test_document_service_marks_document_failed_when_pdf_is_invalid(
     pdf_path.write_bytes(b"not a pdf")
 
     indexing_service = FakeIndexingService()
-    service = create_document_service(
+    service = create_document_processing_service(
         session=session,
         indexing_service=indexing_service,
     )
@@ -89,7 +89,7 @@ async def test_document_service_marks_document_failed_when_pdf_is_invalid(
             path=pdf_path,
         )
 
-    documents = await service.list_user_documents(owner_id=user.id)
+    documents = list(await session.scalars(select(Document).where(Document.owner_id == user.id)))
 
     assert len(documents) == 1
     assert documents[0].status == DocumentStatus.FAILED

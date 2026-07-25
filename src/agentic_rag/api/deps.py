@@ -11,7 +11,7 @@ from agentic_rag.models import User
 from agentic_rag.repositories.chunk import DocumentChunkRepository
 from agentic_rag.repositories.document import DocumentRepository
 from agentic_rag.repositories.user import UserRepository
-from agentic_rag.services.document import DocumentService
+from agentic_rag.services.document import DocumentMetadataService, DocumentProcessingService
 from agentic_rag.services.embedding import EmbeddingService, OpenAIEmbeddingService
 from agentic_rag.services.indexing import DocumentIndexingService
 from agentic_rag.services.retrieval import RetrievalService
@@ -85,13 +85,23 @@ def get_indexing_service(
     )
 
 
-def get_document_service(
+def get_document_metadata_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    document_repository: Annotated[DocumentRepository, Depends(get_document_repository)],
+) -> DocumentMetadataService:
+    return DocumentMetadataService(
+        session=session,
+        document_repository=document_repository,
+    )
+
+
+def get_document_processing_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     document_repository: Annotated[DocumentRepository, Depends(get_document_repository)],
     chunk_repository: Annotated[DocumentChunkRepository, Depends(get_chunk_repository)],
     indexing_service: Annotated[DocumentIndexingService, Depends(get_indexing_service)],
-) -> DocumentService:
-    return DocumentService(
+) -> DocumentProcessingService:
+    return DocumentProcessingService(
         session=session,
         document_repository=document_repository,
         chunk_repository=chunk_repository,

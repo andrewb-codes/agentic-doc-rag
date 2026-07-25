@@ -11,19 +11,15 @@ from agentic_rag.services.indexing import DocumentIndexingService
 from agentic_rag.services.pdf import PdfExtractionError, PdfExtractor
 
 
-class DocumentService:
+class DocumentMetadataService:
     def __init__(
         self,
         *,
         session: AsyncSession,
         document_repository: DocumentRepository,
-        chunk_repository: DocumentChunkRepository,
-        indexing_service: DocumentIndexingService,
     ) -> None:
         self.session = session
         self.document_repository = document_repository
-        self.chunk_repository = chunk_repository
-        self.indexing_service = indexing_service
 
     async def get_user_document(self, *, document_id: int, owner_id: int) -> Document:
         document = await self.document_repository.get_owned_by_id(
@@ -46,6 +42,21 @@ class DocumentService:
         await self.session.commit()
         await self.session.refresh(document)
         return document
+
+
+class DocumentProcessingService:
+    def __init__(
+        self,
+        *,
+        session: AsyncSession,
+        document_repository: DocumentRepository,
+        chunk_repository: DocumentChunkRepository,
+        indexing_service: DocumentIndexingService,
+    ) -> None:
+        self.session = session
+        self.document_repository = document_repository
+        self.chunk_repository = chunk_repository
+        self.indexing_service = indexing_service
 
     async def process_uploaded_pdf(
         self,

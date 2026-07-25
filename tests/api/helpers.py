@@ -1,11 +1,11 @@
-INTERNAL_API_KEY = "test-internal-api-key"
+from agentic_rag.core.config import settings
 
 
 def internal_headers(
     *,
     telegram_user_id: int = 123456789,
     telegram_username: str | None = "andrew",
-    internal_api_key: str = INTERNAL_API_KEY,
+    internal_api_key: str = settings.internal_api_key,
 ) -> dict[str, str]:
     headers = {
         "X-Internal-API-Key": internal_api_key,

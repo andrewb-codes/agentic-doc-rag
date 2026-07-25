@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, File, Path, UploadFile, status
 
 from agentic_rag.api.deps import (
     get_current_telegram_user,
-    get_document_service,
+    get_document_metadata_service,
+    get_document_processing_service,
     get_retrieval_service,
 )
 from agentic_rag.api.presenters.documents import (
@@ -20,7 +21,7 @@ from agentic_rag.schemas.document import (
     DocumentResponse,
     DocumentSearchRequest,
 )
-from agentic_rag.services.document import DocumentService
+from agentic_rag.services.document import DocumentMetadataService, DocumentProcessingService
 from agentic_rag.services.pdf import PdfExtractionError
 from agentic_rag.services.retrieval import RetrievalService
 
@@ -45,11 +46,33 @@ async def search_documents(
     return [build_document_chunk_response(chunk) for chunk in chunks]
 
 
+@router.post("/{document_id}/search", response_model=list[DocumentChunkResponse])
+async def search_document(
+    document_id: Annotated[int, Path(gt=0)],
+    request: DocumentSearchRequest,
+    current_user: Annotated[User, Depends(get_current_telegram_user)],
+    metadata_service: Annotated[DocumentMetadataService, Depends(get_document_metadata_service)],
+    retrieval_service: Annotated[RetrievalService, Depends(get_retrieval_service)],
+) -> list[DocumentChunkResponse]:
+    await metadata_service.get_user_document(
+        document_id=document_id,
+        owner_id=current_user.id,
+    )
+    chunks = await retrieval_service.search_document_chunks(
+        query=request.query,
+        owner_id=current_user.id,
+        document_id=document_id,
+        limit=request.limit,
+    )
+
+    return [build_document_chunk_response(chunk) for chunk in chunks]
+
+
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: Annotated[int, Path(gt=0)],
     current_user: Annotated[User, Depends(get_current_telegram_user)],
-    service: Annotated[DocumentService, Depends(get_document_service)],
+    service: Annotated[DocumentMetadataService, Depends(get_document_metadata_service)],
 ) -> DocumentResponse:
     document = await service.get_user_document(document_id=document_id, owner_id=current_user.id)
     return build_document_response(document)
@@ -58,7 +81,7 @@ async def get_document(
 @router.get("", response_model=list[DocumentResponse])
 async def list_documents(
     current_user: Annotated[User, Depends(get_current_telegram_user)],
-    service: Annotated[DocumentService, Depends(get_document_service)],
+    service: Annotated[DocumentMetadataService, Depends(get_document_metadata_service)],
 ) -> list[DocumentResponse]:
     documents = await service.list_user_documents(owner_id=current_user.id)
     return [build_document_response(document) for document in documents]
@@ -68,11 +91,12 @@ async def list_documents(
 async def create_document_metadata(
     request: DocumentCreateRequest,
     current_user: Annotated[User, Depends(get_current_telegram_user)],
-    service: Annotated[DocumentService, Depends(get_document_service)],
+    service: Annotated[DocumentMetadataService, Depends(get_document_metadata_service)],
 ) -> DocumentResponse:
     document = await service.create_document_metadata(
         owner_id=current_user.id, filename=request.filename
     )
+
     return build_document_response(document)
 
 
@@ -80,7 +104,7 @@ async def create_document_metadata(
 async def upload_document(
     file: Annotated[UploadFile, File()],
     current_user: Annotated[User, Depends(get_current_telegram_user)],
-    service: Annotated[DocumentService, Depends(get_document_service)],
+    service: Annotated[DocumentProcessingService, Depends(get_document_processing_service)],
 ) -> DocumentResponse:
     validate_pdf_upload(file)
     temp_path = await save_upload_to_temp_file(file)

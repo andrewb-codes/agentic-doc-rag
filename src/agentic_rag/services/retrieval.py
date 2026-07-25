@@ -23,10 +23,41 @@ class RetrievalService:
         owner_id: int,
         limit: int,
     ) -> list[DocumentChunk]:
+        return await self._search_chunks(
+            query=query,
+            owner_id=owner_id,
+            document_id=None,
+            limit=limit,
+        )
+
+    async def search_document_chunks(
+        self,
+        *,
+        query: str,
+        owner_id: int,
+        document_id: int,
+        limit: int,
+    ) -> list[DocumentChunk]:
+        return await self._search_chunks(
+            query=query,
+            owner_id=owner_id,
+            document_id=document_id,
+            limit=limit,
+        )
+
+    async def _search_chunks(
+        self,
+        *,
+        query: str,
+        owner_id: int,
+        document_id: int | None,
+        limit: int,
+    ) -> list[DocumentChunk]:
         embeddings = await self.embedding_service.embed_texts(texts=[query])
         search_results = await self.vector_store.search_chunks(
             embedding=embeddings[0],
             owner_id=owner_id,
+            document_id=document_id,
             limit=limit,
         )
 

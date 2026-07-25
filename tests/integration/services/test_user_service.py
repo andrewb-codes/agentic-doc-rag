@@ -8,9 +8,7 @@ def create_user_service(*, session: AsyncSession) -> UserService:
     return UserService(session=session, repository=UserRepository(session=session))
 
 
-async def test_user_service_creates_telegram_user(
-    session: AsyncSession,
-) -> None:
+async def test_user_service_creates_telegram_user(session: AsyncSession) -> None:
     service = create_user_service(session=session)
 
     user = await service.get_or_create_telegram_user(

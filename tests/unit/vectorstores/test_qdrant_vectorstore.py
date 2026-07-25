@@ -179,6 +179,42 @@ async def test_qdrant_upsert_chunks_rejects_mismatched_embeddings_count() -> Non
         )
 
 
+async def test_qdrant_search_chunks_filters_by_owner_and_document() -> None:
+    client = AsyncMock()
+    client.query_points = AsyncMock(return_value=SimpleNamespace(points=[]))
+
+    vector_store = QdrantVectorStore(
+        url="http://unused",
+        collection_name="document_chunks",
+        client=client,
+    )
+
+    await vector_store.search_chunks(
+        embedding=[0.1, 0.2, 0.3],
+        owner_id=1,
+        document_id=20,
+        limit=5,
+    )
+
+    client.query_points.assert_awaited_once_with(
+        collection_name="document_chunks",
+        query=[0.1, 0.2, 0.3],
+        query_filter=Filter(
+            must=[
+                FieldCondition(
+                    key="owner_id",
+                    match=MatchValue(value=1),
+                ),
+                FieldCondition(
+                    key="document_id",
+                    match=MatchValue(value=20),
+                ),
+            ]
+        ),
+        limit=5,
+    )
+
+
 async def test_qdrant_search_chunks_returns_chunk_ids_and_scores() -> None:
     client = AsyncMock()
     client.query_points = AsyncMock(

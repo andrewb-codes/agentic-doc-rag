@@ -1,13 +1,12 @@
 import pytest
 from httpx import AsyncClient
 
-from tests.api.helpers import INTERNAL_API_KEY, internal_headers
+from agentic_rag.core.config import settings
+from tests.api.helpers import internal_headers
 
 
 @pytest.mark.no_db
-async def test_create_document_without_internal_api_key_returns_401(
-    client: AsyncClient,
-) -> None:
+async def test_create_document_without_internal_api_key_returns_401(client: AsyncClient) -> None:
     response = await client.post(
         "/documents",
         headers={"X-Telegram-User-Id": "123456789"},
@@ -19,12 +18,10 @@ async def test_create_document_without_internal_api_key_returns_401(
 
 
 @pytest.mark.no_db
-async def test_create_document_without_telegram_user_id_returns_401(
-    client: AsyncClient,
-) -> None:
+async def test_create_document_without_telegram_user_id_returns_401(client: AsyncClient) -> None:
     response = await client.post(
         "/documents",
-        headers={"X-Internal-API-Key": INTERNAL_API_KEY},
+        headers={"X-Internal-API-Key": settings.internal_api_key},
         json={"filename": "manual.pdf"},
     )
 
@@ -32,9 +29,7 @@ async def test_create_document_without_telegram_user_id_returns_401(
     assert response.json() == {"detail": "error.auth.unauthorized"}
 
 
-async def test_create_document_creates_telegram_user_automatically(
-    client: AsyncClient,
-) -> None:
+async def test_create_document_creates_telegram_user_automatically(client: AsyncClient) -> None:
     response = await client.post(
         "/documents",
         headers=internal_headers(),
@@ -77,9 +72,7 @@ async def test_list_documents_returns_only_current_telegram_user_documents(
     assert body == [first_response.json()]
 
 
-async def test_get_document_returns_current_user_document(
-    client: AsyncClient,
-) -> None:
+async def test_get_document_returns_current_user_document(client: AsyncClient) -> None:
     create_response = await client.post(
         "/documents",
         headers=internal_headers(),
@@ -93,9 +86,7 @@ async def test_get_document_returns_current_user_document(
     assert response.json() == create_response.json()
 
 
-async def test_get_foreign_document_returns_404(
-    client: AsyncClient,
-) -> None:
+async def test_get_foreign_document_returns_404(client: AsyncClient) -> None:
     create_response = await client.post(
         "/documents",
         headers=internal_headers(telegram_user_id=111, telegram_username="first"),

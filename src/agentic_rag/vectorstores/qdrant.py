@@ -132,15 +132,24 @@ class QdrantVectorStore:
         embedding: list[float],
         owner_id: int,
         limit: int,
+        document_id: int | None = None,
     ) -> list[VectorSearchResult]:
-        query_filter = Filter(
-            must=[
+        filter_conditions = [
+            FieldCondition(
+                key="owner_id",
+                match=MatchValue(value=owner_id),
+            )
+        ]
+
+        if document_id is not None:
+            filter_conditions.append(
                 FieldCondition(
-                    key="owner_id",
-                    match=MatchValue(value=owner_id),
+                    key="document_id",
+                    match=MatchValue(value=document_id),
                 )
-            ]
-        )
+            )
+
+        query_filter = Filter(must=filter_conditions)
 
         response = await self.client.query_points(
             collection_name=self.collection_name,

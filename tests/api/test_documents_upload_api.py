@@ -4,10 +4,26 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
+from agentic_rag.api.deps import get_indexing_service
+from agentic_rag.api.main import app
 from agentic_rag.db.session import AsyncSessionLocal
 from agentic_rag.models import DocumentChunk
 from tests.api.helpers import internal_headers
 from tests.helpers.pdf import create_pdf
+
+
+class NoOpIndexingService:
+    async def index_chunks(self, *, chunks: list[DocumentChunk], owner_id: int) -> None:
+        pass
+
+
+async def get_noop_indexing_service() -> NoOpIndexingService:
+    return NoOpIndexingService()
+
+
+@pytest.fixture(autouse=True)
+def override_indexing_service() -> None:
+    app.dependency_overrides[get_indexing_service] = get_noop_indexing_service
 
 
 async def test_upload_pdf_processes_document(client: AsyncClient, tmp_path: Path) -> None:
