@@ -27,11 +27,20 @@ document_status_enum = postgresql.ENUM(
     create_type=False,
 )
 
+verification_verdict_enum = postgresql.ENUM(
+    "not_verified",
+    "supported",
+    "unsupported",
+    name="verification_verdict",
+    create_type=False,
+)
+
 
 def upgrade() -> None:
     """Upgrade schema."""
     bind = op.get_bind()
     document_status_enum.create(bind, checkfirst=True)
+    verification_verdict_enum.create(bind, checkfirst=True)
 
     op.create_table(
         "users",
@@ -65,10 +74,10 @@ def upgrade() -> None:
         "qa_history",
         sa.Column("id", sa.BigInteger(), nullable=False),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
-        sa.Column("document_id", sa.BigInteger(), nullable=False),
+        sa.Column("document_id", sa.BigInteger(), nullable=True),
         sa.Column("question", sa.Text(), nullable=False),
         sa.Column("answer", sa.Text(), nullable=False),
-        sa.Column("verification_verdict", sa.String(length=64), nullable=False),
+        sa.Column("verification_verdict", verification_verdict_enum, nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(["document_id"], ["documents.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
@@ -89,4 +98,5 @@ def downgrade() -> None:
     op.drop_table("users")
 
     bind = op.get_bind()
+    verification_verdict_enum.drop(bind, checkfirst=True)
     document_status_enum.drop(bind, checkfirst=True)

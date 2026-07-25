@@ -36,9 +36,7 @@ class DocumentMetadataService:
         return await self.document_repository.list_by_owner(owner_id=owner_id)
 
     async def create_document_metadata(self, *, owner_id: int, filename: str) -> Document:
-        document = await self.document_repository.create_document_metadata(
-            owner_id=owner_id, filename=filename
-        )
+        document = await self.document_repository.create(owner_id=owner_id, filename=filename)
         await self.session.commit()
         await self.session.refresh(document)
         return document
@@ -65,7 +63,7 @@ class DocumentProcessingService:
         filename: str,
         path: Path,
     ) -> Document:
-        document = await self.document_repository.create_document_metadata(
+        document = await self.document_repository.create(
             owner_id=owner_id,
             filename=filename,
             status=DocumentStatus.PROCESSING,

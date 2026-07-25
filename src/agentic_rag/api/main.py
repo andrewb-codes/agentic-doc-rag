@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from agentic_rag.api.v1.documents import router as documents_router
+from agentic_rag.api.v1.qa_history import router as qa_history_router
 from agentic_rag.core.config import settings
 from agentic_rag.core.exceptions import AppError
 from agentic_rag.core.logging import configure_logging
@@ -37,6 +38,7 @@ if settings.cors_origins:
 app.middleware("http")(request_logging_middleware)
 
 app.include_router(documents_router)
+app.include_router(qa_history_router)
 
 
 @app.get("/health")

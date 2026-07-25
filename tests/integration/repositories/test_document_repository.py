@@ -12,7 +12,7 @@ async def test_document_repository_get_owned_by_id_returns_only_owner_document(
     second_user = await create_user(session, telegram_user_id=222, username="second")
 
     repository = DocumentRepository(session=session)
-    document = await repository.create_document_metadata(
+    document = await repository.create(
         owner_id=first_user.id,
         filename="manual.pdf",
     )
@@ -37,15 +37,15 @@ async def test_document_repository_lists_documents_by_owner_descending(
     second_user = await create_user(session, telegram_user_id=222, username="second")
 
     repository = DocumentRepository(session=session)
-    first_document = await repository.create_document_metadata(
+    first_document = await repository.create(
         owner_id=first_user.id,
         filename="first.pdf",
     )
-    second_document = await repository.create_document_metadata(
+    second_document = await repository.create(
         owner_id=first_user.id,
         filename="second.pdf",
     )
-    await repository.create_document_metadata(
+    await repository.create(
         owner_id=second_user.id,
         filename="foreign.pdf",
     )
@@ -61,7 +61,7 @@ async def test_document_repository_updates_processing_result(
     user = await create_user(session)
 
     repository = DocumentRepository(session=session)
-    document = await repository.create_document_metadata(
+    document = await repository.create(
         owner_id=user.id,
         filename="manual.pdf",
         status=DocumentStatus.PROCESSING,

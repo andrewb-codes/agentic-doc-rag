@@ -1,12 +1,15 @@
 from unittest.mock import AsyncMock
 
 from httpx import AsyncClient
+from sqlalchemy import select
 
-from agentic_rag.api.deps import get_answer_service
+from agentic_rag.api.deps import get_answer_service, get_chat_service, get_retrieval_service
 from agentic_rag.api.main import app
-from agentic_rag.models import DocumentChunk
+from agentic_rag.db.session import AsyncSessionLocal
+from agentic_rag.models import DocumentChunk, QAHistory, VerificationVerdict
 from agentic_rag.services.answer import AnswerResult
 from tests.api.helpers import internal_headers
+from tests.integration.helpers import create_document, create_user
 
 
 class FakeAnswerService:
@@ -15,11 +18,37 @@ class FakeAnswerService:
         self.answer_document_question = AsyncMock(return_value=result)
 
 
+class FakeRetrievalService:
+    def __init__(self, *, chunks: list[DocumentChunk]) -> None:
+        self.search_user_chunks = AsyncMock(return_value=chunks)
+        self.search_document_chunks = AsyncMock(return_value=chunks)
+
+
+class FakeChatService:
+    def __init__(self, *, answer: str) -> None:
+        self.answer_question = AsyncMock(return_value=answer)
+
+
 def override_answer_service(answer_service: FakeAnswerService) -> None:
     async def get_fake_answer_service() -> FakeAnswerService:
         return answer_service
 
     app.dependency_overrides[get_answer_service] = get_fake_answer_service
+
+
+def override_answer_dependencies(
+    *,
+    retrieval_service: FakeRetrievalService,
+    chat_service: FakeChatService,
+) -> None:
+    async def get_fake_retrieval_service() -> FakeRetrievalService:
+        return retrieval_service
+
+    async def get_fake_chat_service() -> FakeChatService:
+        return chat_service
+
+    app.dependency_overrides[get_retrieval_service] = get_fake_retrieval_service
+    app.dependency_overrides[get_chat_service] = get_fake_chat_service
 
 
 async def test_ask_documents_returns_answer_for_current_user(client: AsyncClient) -> None:
@@ -98,6 +127,80 @@ async def test_ask_document_returns_answer_for_current_user_document(client: Asy
         document_id=document_id,
         limit=5,
     )
+
+
+async def test_ask_documents_saves_qa_history(client: AsyncClient) -> None:
+    chunk = DocumentChunk(
+        id=10,
+        document_id=20,
+        page=3,
+        chunk_index=0,
+        text="Project Atlas started on March 14, 2025.",
+        source="manual.pdf",
+    )
+    retrieval_service = FakeRetrievalService(chunks=[chunk])
+    chat_service = FakeChatService(answer="Atlas started on March 14, 2025.")
+    override_answer_dependencies(
+        retrieval_service=retrieval_service,
+        chat_service=chat_service,
+    )
+
+    response = await client.post(
+        "/documents/ask",
+        headers=internal_headers(),
+        json={"question": "When did Atlas start?", "limit": 5},
+    )
+
+    async with AsyncSessionLocal() as session:
+        history_item = await session.scalar(select(QAHistory))
+
+    assert response.status_code == 200
+    assert history_item is not None
+    assert history_item.user_id == 1
+    assert history_item.document_id is None
+    assert history_item.question == "When did Atlas start?"
+    assert history_item.answer == "Atlas started on March 14, 2025."
+    assert history_item.verification_verdict == VerificationVerdict.NOT_VERIFIED
+
+
+async def test_ask_document_saves_qa_history_with_document_id(client: AsyncClient) -> None:
+    async with AsyncSessionLocal() as session:
+        user = await create_user(session, telegram_user_id=123456789)
+        document = await create_document(session, owner_id=user.id)
+        document_id = document.id
+        await session.commit()
+
+    chunk = DocumentChunk(
+        id=10,
+        document_id=document_id,
+        page=3,
+        chunk_index=0,
+        text="Project Atlas started on March 14, 2025.",
+        source="manual.pdf",
+    )
+    retrieval_service = FakeRetrievalService(chunks=[chunk])
+    chat_service = FakeChatService(answer="Atlas started on March 14, 2025.")
+    override_answer_dependencies(
+        retrieval_service=retrieval_service,
+        chat_service=chat_service,
+    )
+
+    response = await client.post(
+        f"/documents/{document_id}/ask",
+        headers=internal_headers(),
+        json={"question": "When did Atlas start?", "limit": 5},
+    )
+
+    async with AsyncSessionLocal() as session:
+        history_item = await session.scalar(select(QAHistory))
+
+    assert response.status_code == 200
+    assert history_item is not None
+    assert history_item.user_id == 1
+    assert history_item.document_id == document_id
+    assert history_item.question == "When did Atlas start?"
+    assert history_item.answer == "Atlas started on March 14, 2025."
+    assert history_item.verification_verdict == VerificationVerdict.NOT_VERIFIED
 
 
 async def test_ask_documents_uses_default_limit(client: AsyncClient) -> None:

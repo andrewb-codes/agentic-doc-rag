@@ -21,7 +21,7 @@ class DocumentRepository:
         query = select(Document).where(Document.owner_id == owner_id).order_by(Document.id.desc())
         return list(await self.session.scalars(query))
 
-    async def create_document_metadata(
+    async def create(
         self,
         *,
         owner_id: int,

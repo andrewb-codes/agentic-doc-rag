@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from agentic_rag.models import DocumentChunk
+from agentic_rag.repositories.qa_history import QAHistoryRepository
 from agentic_rag.services.llm import OpenAIChatService
 from agentic_rag.services.retrieval import RetrievalService
 
@@ -15,11 +18,15 @@ class AnswerService:
     def __init__(
         self,
         *,
+        session: AsyncSession,
         retrieval_service: RetrievalService,
         chat_service: OpenAIChatService,
+        qa_history_repository: QAHistoryRepository,
     ) -> None:
+        self.session = session
         self.retrieval_service = retrieval_service
         self.chat_service = chat_service
+        self.qa_history_repository = qa_history_repository
 
     async def answer_user_question(
         self,
@@ -34,6 +41,14 @@ class AnswerService:
             limit=limit,
         )
         answer = await self.chat_service.answer_question(question=question, chunks=chunks)
+
+        await self.qa_history_repository.create(
+            user_id=owner_id,
+            document_id=None,
+            question=question,
+            answer=answer,
+        )
+        await self.session.commit()
 
         return AnswerResult(answer=answer, chunks=chunks)
 
@@ -52,5 +67,13 @@ class AnswerService:
             limit=limit,
         )
         answer = await self.chat_service.answer_question(question=question, chunks=chunks)
+
+        await self.qa_history_repository.create(
+            user_id=owner_id,
+            document_id=document_id,
+            question=question,
+            answer=answer,
+        )
+        await self.session.commit()
 
         return AnswerResult(answer=answer, chunks=chunks)
