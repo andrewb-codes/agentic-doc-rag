@@ -8,8 +8,7 @@ from agentic_rag.api.main import app
 from agentic_rag.db.session import AsyncSessionLocal
 from agentic_rag.models import DocumentChunk, QAHistory, VerificationVerdict
 from agentic_rag.services.answer import AnswerResult
-from tests.api.helpers import internal_headers
-from tests.integration.helpers import create_document, create_user
+from tests.helpers import create_document, create_user, internal_headers
 
 
 class FakeAnswerService:
@@ -104,12 +103,11 @@ async def test_ask_documents_returns_answer_for_current_user(client: AsyncClient
 
 
 async def test_ask_document_returns_answer_for_current_user_document(client: AsyncClient) -> None:
-    create_response = await client.post(
-        "/documents",
-        headers=internal_headers(),
-        json={"filename": "manual.pdf"},
-    )
-    document_id = create_response.json()["id"]
+    async with AsyncSessionLocal() as session:
+        user = await create_user(session, telegram_user_id=123456789, username="andrew")
+        document = await create_document(session, owner_id=user.id, filename="manual.pdf")
+        document_id = document.id
+        await session.commit()
 
     chunk = DocumentChunk(
         id=10,
@@ -254,12 +252,11 @@ async def test_ask_documents_uses_default_limit(client: AsyncClient) -> None:
 
 
 async def test_ask_foreign_document_returns_404(client: AsyncClient) -> None:
-    create_response = await client.post(
-        "/documents",
-        headers=internal_headers(telegram_user_id=111, telegram_username="first"),
-        json={"filename": "first.pdf"},
-    )
-    document_id = create_response.json()["id"]
+    async with AsyncSessionLocal() as session:
+        first_user = await create_user(session, telegram_user_id=111, username="first")
+        document = await create_document(session, owner_id=first_user.id, filename="first.pdf")
+        document_id = document.id
+        await session.commit()
 
     answer_service = FakeAnswerService(
         result=AnswerResult(

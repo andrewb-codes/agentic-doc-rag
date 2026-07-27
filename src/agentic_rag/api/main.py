@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -10,13 +11,31 @@ from agentic_rag.core.config import settings
 from agentic_rag.core.exceptions import AppError
 from agentic_rag.core.logging import configure_logging
 from agentic_rag.middleware.request_logging import request_logging_middleware
+from agentic_rag.rate_limit.service import RateLimitService
 
 configure_logging(settings)
+logger = structlog.get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    yield
+    logger.info("application_starting")
+
+    rate_limiter = RateLimitService.from_settings(settings)
+
+    if rate_limiter.enabled and not await rate_limiter.check_storage():
+        logger.error("rate_limit_storage_unavailable")
+        raise RuntimeError("Rate limit Redis storage is not available")
+
+    app.state.rate_limiter = rate_limiter
+    logger.info("application_started")
+
+    try:
+        yield
+    finally:
+        logger.info("application_stopping")
+        app.state.rate_limiter = None
+        logger.info("application_stopped")
 
 
 app = FastAPI(
@@ -54,5 +73,7 @@ async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
         headers = {"Retry-After": str(exc.retry_after)}
 
     return JSONResponse(
-        status_code=exc.status_code, content={"detail": exc.detail}, headers=headers
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=headers,
     )

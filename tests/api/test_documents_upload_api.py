@@ -8,7 +8,7 @@ from agentic_rag.api.deps import get_indexing_service
 from agentic_rag.api.main import app
 from agentic_rag.db.session import AsyncSessionLocal
 from agentic_rag.models import DocumentChunk
-from tests.api.helpers import internal_headers
+from tests.helpers import internal_headers
 from tests.helpers.pdf import create_pdf
 
 

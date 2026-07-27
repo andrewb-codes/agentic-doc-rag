@@ -1,29 +1,7 @@
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentic_rag.db.session import AsyncSessionLocal
-from agentic_rag.models import QAHistory, VerificationVerdict
-from agentic_rag.repositories.qa_history import QAHistoryRepository
-from tests.api.helpers import internal_headers
-from tests.integration.helpers import create_document, create_user
-
-
-async def create_qa_history(
-    session: AsyncSession,
-    *,
-    user_id: int,
-    document_id: int | None = None,
-    question: str = "Question?",
-    answer: str = "Answer.",
-    verification_verdict: VerificationVerdict = VerificationVerdict.NOT_VERIFIED,
-) -> QAHistory:
-    return await QAHistoryRepository(session=session).create(
-        user_id=user_id,
-        document_id=document_id,
-        question=question,
-        answer=answer,
-        verification_verdict=verification_verdict,
-    )
+from tests.helpers import create_document, create_qa_history, create_user, internal_headers
 
 
 async def test_list_user_qa_history_returns_empty_list(client: AsyncClient) -> None:

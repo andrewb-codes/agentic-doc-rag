@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 20.0
     llm_max_retries: int = 0
 
+    rate_limit_enabled: bool = True
+    rate_limit_redis_url: str | None = None
+    rate_limit_redis_implementation: Literal["redispy", "coredis", "valkey"] = "redispy"
+    rate_limit_key_prefix: str = "rag"
+
     backend_cors_origins: str = ""
 
     model_config = SettingsConfigDict(

@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentic_rag.models import VerificationVerdict
 from agentic_rag.repositories.qa_history import QAHistoryRepository
-from tests.integration.helpers import create_document, create_user
+from tests.helpers import create_document, create_user
 
 
 async def test_qa_history_repository_creates_history_item(session: AsyncSession) -> None:

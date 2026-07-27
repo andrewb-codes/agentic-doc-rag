@@ -1,22 +1,12 @@
 from collections.abc import AsyncGenerator
 
 import pytest
-from asgi_lifespan import LifespanManager
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 
-from agentic_rag.api.main import app
+from tests.helpers import app_client
 
 
 @pytest.fixture
 async def client() -> AsyncGenerator[AsyncClient]:
-    try:
-        async with (
-            LifespanManager(app),
-            AsyncClient(
-                transport=ASGITransport(app=app),
-                base_url="http://test",
-            ) as client,
-        ):
-            yield client
-    finally:
-        app.dependency_overrides.clear()
+    async with app_client() as client:
+        yield client

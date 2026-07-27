@@ -1,4 +1,24 @@
 services:
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "127.0.0.1:${REDIS_PORT:?REDIS_PORT is required}:6379"
+    command:
+      - redis-server
+      - --appendonly
+      - "no"
+      - --save
+      - ""
+      - --maxmemory
+      - 128mb
+      - --maxmemory-policy
+      - volatile-ttl
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   postgres:
     image: postgres:17
     environment:

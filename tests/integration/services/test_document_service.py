@@ -12,8 +12,8 @@ from agentic_rag.repositories.document import DocumentRepository
 from agentic_rag.services.document import DocumentProcessingService
 from agentic_rag.services.indexing import DocumentIndexingService
 from agentic_rag.services.pdf import InvalidPdfError
+from tests.helpers import create_user
 from tests.helpers.pdf import create_pdf
-from tests.integration.helpers import create_user
 
 
 class FakeIndexingService:

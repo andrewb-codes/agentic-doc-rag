@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentic_rag.models import DocumentStatus
 from agentic_rag.repositories.document import DocumentRepository
-from tests.integration.helpers import create_user
+from tests.helpers import create_user
 
 
 async def test_document_repository_get_owned_by_id_returns_only_owner_document(

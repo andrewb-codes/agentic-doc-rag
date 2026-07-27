@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agentic_rag.models import DocumentChunk
 from agentic_rag.repositories.chunk import DocumentChunkRepository
 from agentic_rag.services.chunk import TextChunk
-from tests.integration.helpers import create_document, create_user
+from tests.helpers import create_document, create_user
 
 
 async def test_chunk_repository_creates_chunks(

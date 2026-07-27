@@ -4,8 +4,9 @@ from httpx import AsyncClient
 
 from agentic_rag.api.deps import get_retrieval_service
 from agentic_rag.api.main import app
+from agentic_rag.db.session import AsyncSessionLocal
 from agentic_rag.models import DocumentChunk
-from tests.api.helpers import internal_headers
+from tests.helpers import create_document, create_user, internal_headers
 
 
 class FakeRetrievalService:
@@ -101,12 +102,11 @@ async def test_search_documents_rejects_too_large_limit(client: AsyncClient) -> 
 async def test_search_document_returns_chunks_for_current_user_document(
     client: AsyncClient,
 ) -> None:
-    create_response = await client.post(
-        "/documents",
-        headers=internal_headers(),
-        json={"filename": "manual.pdf"},
-    )
-    document_id = create_response.json()["id"]
+    async with AsyncSessionLocal() as session:
+        user = await create_user(session, telegram_user_id=123456789, username="andrew")
+        document = await create_document(session, owner_id=user.id, filename="manual.pdf")
+        document_id = document.id
+        await session.commit()
 
     chunk = DocumentChunk(
         id=10,
@@ -145,12 +145,11 @@ async def test_search_document_returns_chunks_for_current_user_document(
 
 
 async def test_search_foreign_document_returns_404(client: AsyncClient) -> None:
-    create_response = await client.post(
-        "/documents",
-        headers=internal_headers(telegram_user_id=111, telegram_username="first"),
-        json={"filename": "first.pdf"},
-    )
-    document_id = create_response.json()["id"]
+    async with AsyncSessionLocal() as session:
+        first_user = await create_user(session, telegram_user_id=111, username="first")
+        document = await create_document(session, owner_id=first_user.id, filename="first.pdf")
+        document_id = document.id
+        await session.commit()
 
     retrieval_service = FakeRetrievalService(chunks=[])
     override_retrieval_service(retrieval_service)

@@ -20,6 +20,8 @@ api = [
   "structlog>=25.1",
   "python-multipart>=0.0.9",
   "openai>=1.0",
+  "limits[redis]>=5.8,<6",
+  "redis>=5.0",
 ]
 
 all = [

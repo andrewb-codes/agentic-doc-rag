@@ -17,11 +17,16 @@ from agentic_rag.api.presenters.documents import (
 from agentic_rag.api.upload import save_upload_to_temp_file, validate_pdf_upload
 from agentic_rag.core.exceptions import PdfProcessingError
 from agentic_rag.models import User
+from agentic_rag.rate_limit.deps import rate_limit_user
+from agentic_rag.rate_limit.rules import (
+    DOCUMENT_ASK_LIMIT,
+    DOCUMENT_SEARCH_LIMIT,
+    DOCUMENT_UPLOAD_LIMIT,
+)
 from agentic_rag.schemas.document import (
     DocumentAskRequest,
     DocumentAskResponse,
     DocumentChunkResponse,
-    DocumentCreateRequest,
     DocumentResponse,
     DocumentSearchRequest,
 )
@@ -45,20 +50,12 @@ async def list_documents(
     return [build_document_response(document) for document in documents]
 
 
-@router.post("", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
-async def create_document_metadata(
-    request: DocumentCreateRequest,
-    current_user: Annotated[User, Depends(get_current_telegram_user)],
-    service: Annotated[DocumentMetadataService, Depends(get_document_metadata_service)],
-) -> DocumentResponse:
-    document = await service.create_document_metadata(
-        owner_id=current_user.id, filename=request.filename
-    )
-
-    return build_document_response(document)
-
-
-@router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/upload",
+    response_model=DocumentResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit_user(DOCUMENT_UPLOAD_LIMIT))],
+)
 async def upload_document(
     file: Annotated[UploadFile, File()],
     current_user: Annotated[User, Depends(get_current_telegram_user)],
@@ -82,7 +79,11 @@ async def upload_document(
     return build_document_response(document)
 
 
-@router.post("/search", response_model=list[DocumentChunkResponse])
+@router.post(
+    "/search",
+    response_model=list[DocumentChunkResponse],
+    dependencies=[Depends(rate_limit_user(DOCUMENT_SEARCH_LIMIT))],
+)
 async def search_documents(
     request: DocumentSearchRequest,
     current_user: Annotated[User, Depends(get_current_telegram_user)],
@@ -97,7 +98,11 @@ async def search_documents(
     return [build_document_chunk_response(chunk) for chunk in chunks]
 
 
-@router.post("/ask", response_model=DocumentAskResponse)
+@router.post(
+    "/ask",
+    response_model=DocumentAskResponse,
+    dependencies=[Depends(rate_limit_user(DOCUMENT_ASK_LIMIT))],
+)
 async def ask_documents(
     request: DocumentAskRequest,
     current_user: Annotated[User, Depends(get_current_telegram_user)],
@@ -122,7 +127,11 @@ async def get_document(
     return build_document_response(document)
 
 
-@router.post("/{document_id}/search", response_model=list[DocumentChunkResponse])
+@router.post(
+    "/{document_id}/search",
+    response_model=list[DocumentChunkResponse],
+    dependencies=[Depends(rate_limit_user(DOCUMENT_SEARCH_LIMIT))],
+)
 async def search_document(
     document_id: Annotated[int, Path(gt=0)],
     request: DocumentSearchRequest,
@@ -144,7 +153,11 @@ async def search_document(
     return [build_document_chunk_response(chunk) for chunk in chunks]
 
 
-@router.post("/{document_id}/ask", response_model=DocumentAskResponse)
+@router.post(
+    "/{document_id}/ask",
+    response_model=DocumentAskResponse,
+    dependencies=[Depends(rate_limit_user(DOCUMENT_ASK_LIMIT))],
+)
 async def ask_document(
     document_id: Annotated[int, Path(gt=0)],
     request: DocumentAskRequest,
