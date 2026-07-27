@@ -34,4 +34,5 @@ def build_document_ask_response(result: AnswerResult) -> DocumentAskResponse:
     return DocumentAskResponse(
         answer=result.answer,
         chunks=[build_document_chunk_response(chunk) for chunk in result.chunks],
+        verification_verdict=result.verification_verdict,
     )

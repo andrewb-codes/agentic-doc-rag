@@ -1,8 +1,11 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
+from openai import APITimeoutError
 
+from agentic_rag.core.exceptions import EmbeddingProviderTimeoutError
 from agentic_rag.services.embedding import FakeEmbeddingService, OpenAIEmbeddingService
 
 pytestmark = pytest.mark.no_db
@@ -63,3 +66,20 @@ async def test_openai_embedding_service_exposes_vector_size() -> None:
         client=AsyncMock(),
     )
     assert service.vector_size == 1536
+
+
+async def test_openai_embedding_service_converts_timeout_error() -> None:
+    client = AsyncMock()
+    client.embeddings.create = AsyncMock(
+        side_effect=APITimeoutError(request=httpx.Request("POST", "https://provider.test"))
+    )
+
+    service = OpenAIEmbeddingService(
+        api_key="test-key",
+        model="text-embedding-3-small",
+        vector_size=3,
+        client=client,
+    )
+
+    with pytest.raises(EmbeddingProviderTimeoutError):
+        await service.embed_texts(texts=["first"])

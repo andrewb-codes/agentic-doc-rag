@@ -25,8 +25,14 @@ class FakeRetrievalService:
 
 
 class FakeChatService:
-    def __init__(self, *, answer: str) -> None:
+    def __init__(
+        self,
+        *,
+        answer: str,
+        verification_verdict: str = "supported",
+    ) -> None:
         self.answer_question = AsyncMock(return_value=answer)
+        self.verify_answer = AsyncMock(return_value=verification_verdict)
 
 
 def override_answer_service(answer_service: FakeAnswerService) -> None:
@@ -61,7 +67,11 @@ async def test_ask_documents_returns_answer_for_current_user(client: AsyncClient
         source="manual.pdf",
     )
     answer_service = FakeAnswerService(
-        result=AnswerResult(answer="Atlas started on March 14, 2025.", chunks=[chunk])
+        result=AnswerResult(
+            answer="Atlas started on March 14, 2025.",
+            chunks=[chunk],
+            verification_verdict=VerificationVerdict.SUPPORTED,
+        )
     )
     override_answer_service(answer_service)
 
@@ -84,6 +94,7 @@ async def test_ask_documents_returns_answer_for_current_user(client: AsyncClient
                 "source": "manual.pdf",
             }
         ],
+        "verification_verdict": "supported",
     }
     answer_service.answer_user_question.assert_awaited_once_with(
         question="When did Atlas start?",
@@ -109,7 +120,11 @@ async def test_ask_document_returns_answer_for_current_user_document(client: Asy
         source="manual.pdf",
     )
     answer_service = FakeAnswerService(
-        result=AnswerResult(answer="Atlas started on March 14, 2025.", chunks=[chunk])
+        result=AnswerResult(
+            answer="Atlas started on March 14, 2025.",
+            chunks=[chunk],
+            verification_verdict=VerificationVerdict.SUPPORTED,
+        )
     )
     override_answer_service(answer_service)
 
@@ -139,7 +154,10 @@ async def test_ask_documents_saves_qa_history(client: AsyncClient) -> None:
         source="manual.pdf",
     )
     retrieval_service = FakeRetrievalService(chunks=[chunk])
-    chat_service = FakeChatService(answer="Atlas started on March 14, 2025.")
+    chat_service = FakeChatService(
+        answer="Atlas started on March 14, 2025.",
+        verification_verdict="supported",
+    )
     override_answer_dependencies(
         retrieval_service=retrieval_service,
         chat_service=chat_service,
@@ -160,7 +178,7 @@ async def test_ask_documents_saves_qa_history(client: AsyncClient) -> None:
     assert history_item.document_id is None
     assert history_item.question == "When did Atlas start?"
     assert history_item.answer == "Atlas started on March 14, 2025."
-    assert history_item.verification_verdict == VerificationVerdict.NOT_VERIFIED
+    assert history_item.verification_verdict == VerificationVerdict.SUPPORTED
 
 
 async def test_ask_document_saves_qa_history_with_document_id(client: AsyncClient) -> None:
@@ -179,7 +197,10 @@ async def test_ask_document_saves_qa_history_with_document_id(client: AsyncClien
         source="manual.pdf",
     )
     retrieval_service = FakeRetrievalService(chunks=[chunk])
-    chat_service = FakeChatService(answer="Atlas started on March 14, 2025.")
+    chat_service = FakeChatService(
+        answer="Atlas started on March 14, 2025.",
+        verification_verdict="supported",
+    )
     override_answer_dependencies(
         retrieval_service=retrieval_service,
         chat_service=chat_service,
@@ -200,11 +221,17 @@ async def test_ask_document_saves_qa_history_with_document_id(client: AsyncClien
     assert history_item.document_id == document_id
     assert history_item.question == "When did Atlas start?"
     assert history_item.answer == "Atlas started on March 14, 2025."
-    assert history_item.verification_verdict == VerificationVerdict.NOT_VERIFIED
+    assert history_item.verification_verdict == VerificationVerdict.SUPPORTED
 
 
 async def test_ask_documents_uses_default_limit(client: AsyncClient) -> None:
-    answer_service = FakeAnswerService(result=AnswerResult(answer="No answer.", chunks=[]))
+    answer_service = FakeAnswerService(
+        result=AnswerResult(
+            answer="No answer.",
+            chunks=[],
+            verification_verdict=VerificationVerdict.UNSUPPORTED,
+        )
+    )
     override_answer_service(answer_service)
 
     response = await client.post(
@@ -214,7 +241,11 @@ async def test_ask_documents_uses_default_limit(client: AsyncClient) -> None:
     )
 
     assert response.status_code == 200
-    assert response.json() == {"answer": "No answer.", "chunks": []}
+    assert response.json() == {
+        "answer": "No answer.",
+        "chunks": [],
+        "verification_verdict": "unsupported",
+    }
     answer_service.answer_user_question.assert_awaited_once_with(
         question="Unknown?",
         owner_id=1,
@@ -230,7 +261,13 @@ async def test_ask_foreign_document_returns_404(client: AsyncClient) -> None:
     )
     document_id = create_response.json()["id"]
 
-    answer_service = FakeAnswerService(result=AnswerResult(answer="", chunks=[]))
+    answer_service = FakeAnswerService(
+        result=AnswerResult(
+            answer="",
+            chunks=[],
+            verification_verdict=VerificationVerdict.UNSUPPORTED,
+        )
+    )
     override_answer_service(answer_service)
 
     response = await client.post(

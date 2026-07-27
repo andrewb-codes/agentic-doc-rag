@@ -23,11 +23,15 @@ class Settings(BaseSettings):
     embedding_api_key: str
     embedding_base_url: str | None = None
     embedding_model: str = "text-embedding-3-small"
+    embedding_timeout_seconds: float = 20.0
+    embedding_max_retries: int = 0
 
     llm_api_key: str
     llm_base_url: str | None = None
-    llm_model: str = "gpt-5.4-mini"
+    llm_model: str = "gpt-4o-mini"
     llm_max_tokens: int = 1000
+    llm_timeout_seconds: float = 20.0
+    llm_max_retries: int = 0
 
     backend_cors_origins: str = ""
 

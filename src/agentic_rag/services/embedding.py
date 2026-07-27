@@ -1,6 +1,8 @@
 from typing import Protocol
 
-from openai import AsyncOpenAI
+from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI
+
+from agentic_rag.core.exceptions import EmbeddingProviderError, EmbeddingProviderTimeoutError
 
 
 class EmbeddingService(Protocol):
@@ -33,6 +35,8 @@ class OpenAIEmbeddingService:
         vector_size: int = 1536,
         client: AsyncOpenAI | None = None,
         base_url: str | None = None,
+        timeout_seconds: float = 20.0,
+        max_retries: int = 0,
     ) -> None:
         self.client = (
             client
@@ -40,8 +44,8 @@ class OpenAIEmbeddingService:
             else AsyncOpenAI(
                 api_key=api_key,
                 base_url=base_url,
-                max_retries=1,
-                timeout=30.0,
+                max_retries=max_retries,
+                timeout=timeout_seconds,
             )
         )
         self.model = model
@@ -52,9 +56,14 @@ class OpenAIEmbeddingService:
         return self._vector_size
 
     async def embed_texts(self, *, texts: list[str]) -> list[list[float]]:
-        response = await self.client.embeddings.create(
-            model=self.model,
-            input=texts,
-        )
+        try:
+            response = await self.client.embeddings.create(
+                model=self.model,
+                input=texts,
+            )
+        except APITimeoutError as exc:
+            raise EmbeddingProviderTimeoutError() from exc
+        except (APIConnectionError, APIStatusError) as exc:
+            raise EmbeddingProviderError() from exc
 
         return [item.embedding for item in response.data]

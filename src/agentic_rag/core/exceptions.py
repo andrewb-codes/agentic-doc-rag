@@ -26,3 +26,23 @@ class UploadTooLargeError(AppError):
 class PdfProcessingError(AppError):
     status_code = 422
     detail = "error.pdf.processing_failed"
+
+
+class EmbeddingProviderError(AppError):
+    status_code = 502
+    detail = "error.embedding.provider_failed"
+
+
+class EmbeddingProviderTimeoutError(AppError):
+    status_code = 504
+    detail = "error.embedding.timeout"
+
+
+class LLMProviderError(AppError):
+    status_code = 502
+    detail = "error.llm.provider_failed"
+
+
+class LLMProviderTimeoutError(AppError):
+    status_code = 504
+    detail = "error.llm.timeout"

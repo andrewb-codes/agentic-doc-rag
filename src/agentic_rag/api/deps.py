@@ -20,6 +20,7 @@ from agentic_rag.services.llm import OpenAIChatService
 from agentic_rag.services.qa_history import QAHistoryService
 from agentic_rag.services.retrieval import RetrievalService
 from agentic_rag.services.user import UserService
+from agentic_rag.services.verification import AnswerVerificationService
 from agentic_rag.vectorstores.qdrant import QdrantVectorStore
 
 
@@ -70,6 +71,8 @@ def get_embedding_service() -> EmbeddingService:
         api_key=settings.embedding_api_key,
         model=settings.embedding_model,
         base_url=settings.embedding_base_url,
+        timeout_seconds=settings.embedding_timeout_seconds,
+        max_retries=settings.embedding_max_retries,
     )
 
 
@@ -137,19 +140,31 @@ def get_chat_service() -> OpenAIChatService:
         model=settings.llm_model,
         max_tokens=settings.llm_max_tokens,
         base_url=settings.llm_base_url,
+        timeout_seconds=settings.llm_timeout_seconds,
+        max_retries=settings.llm_max_retries,
     )
+
+
+def get_answer_verification_service(
+    chat_service: Annotated[OpenAIChatService, Depends(get_chat_service)],
+) -> AnswerVerificationService:
+    return AnswerVerificationService(chat_service=chat_service)
 
 
 def get_answer_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     retrieval_service: Annotated[RetrievalService, Depends(get_retrieval_service)],
     chat_service: Annotated[OpenAIChatService, Depends(get_chat_service)],
+    verification_service: Annotated[
+        AnswerVerificationService, Depends(get_answer_verification_service)
+    ],
     qa_history_repository: Annotated[QAHistoryRepository, Depends(get_qa_history_repository)],
 ) -> AnswerService:
     return AnswerService(
         session=session,
         retrieval_service=retrieval_service,
         chat_service=chat_service,
+        verification_service=verification_service,
         qa_history_repository=qa_history_repository,
     )
 

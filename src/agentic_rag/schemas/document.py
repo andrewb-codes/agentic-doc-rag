@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from agentic_rag.models import DocumentStatus
+from agentic_rag.models import DocumentStatus, VerificationVerdict
 
 
 class DocumentCreateRequest(BaseModel):
@@ -41,3 +41,4 @@ class DocumentAskRequest(BaseModel):
 class DocumentAskResponse(BaseModel):
     answer: str
     chunks: list[DocumentChunkResponse]
+    verification_verdict: VerificationVerdict

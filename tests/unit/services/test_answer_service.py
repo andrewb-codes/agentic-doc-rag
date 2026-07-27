@@ -5,11 +5,12 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agentic_rag.models import DocumentChunk
+from agentic_rag.models import DocumentChunk, VerificationVerdict
 from agentic_rag.repositories.qa_history import QAHistoryRepository
 from agentic_rag.services.answer import AnswerService
 from agentic_rag.services.llm import OpenAIChatService
 from agentic_rag.services.retrieval import RetrievalService
+from agentic_rag.services.verification import AnswerVerificationService
 
 pytestmark = pytest.mark.no_db
 
@@ -25,6 +26,7 @@ async def test_answer_service_answers_question_from_user_chunks() -> None:
     )
     search_user_chunks = AsyncMock(return_value=[chunk])
     answer_question = AsyncMock(return_value="Atlas started on March 14, 2025.")
+    verify_answer = AsyncMock(return_value=VerificationVerdict.SUPPORTED)
     create_history = AsyncMock()
     commit = AsyncMock()
 
@@ -37,6 +39,10 @@ async def test_answer_service_answers_question_from_user_chunks() -> None:
         chat_service=cast(
             OpenAIChatService,
             cast(object, SimpleNamespace(answer_question=answer_question)),
+        ),
+        verification_service=cast(
+            AnswerVerificationService,
+            cast(object, SimpleNamespace(verify_answer=verify_answer)),
         ),
         qa_history_repository=cast(
             QAHistoryRepository,
@@ -59,15 +65,22 @@ async def test_answer_service_answers_question_from_user_chunks() -> None:
         question="When did Atlas start?",
         chunks=[chunk],
     )
+    verify_answer.assert_awaited_once_with(
+        question="When did Atlas start?",
+        answer="Atlas started on March 14, 2025.",
+        chunks=[chunk],
+    )
     create_history.assert_awaited_once_with(
         user_id=1,
         document_id=None,
         question="When did Atlas start?",
         answer="Atlas started on March 14, 2025.",
+        verification_verdict=VerificationVerdict.SUPPORTED,
     )
     commit.assert_awaited_once_with()
     assert result.answer == "Atlas started on March 14, 2025."
     assert result.chunks == [chunk]
+    assert result.verification_verdict == VerificationVerdict.SUPPORTED
 
 
 async def test_answer_service_answers_question_from_document_chunks() -> None:
@@ -81,6 +94,7 @@ async def test_answer_service_answers_question_from_document_chunks() -> None:
     )
     search_document_chunks = AsyncMock(return_value=[chunk])
     answer_question = AsyncMock(return_value="Atlas started on March 14, 2025.")
+    verify_answer = AsyncMock(return_value=VerificationVerdict.SUPPORTED)
     create_history = AsyncMock()
     commit = AsyncMock()
 
@@ -93,6 +107,10 @@ async def test_answer_service_answers_question_from_document_chunks() -> None:
         chat_service=cast(
             OpenAIChatService,
             cast(object, SimpleNamespace(answer_question=answer_question)),
+        ),
+        verification_service=cast(
+            AnswerVerificationService,
+            cast(object, SimpleNamespace(verify_answer=verify_answer)),
         ),
         qa_history_repository=cast(
             QAHistoryRepository,
@@ -117,12 +135,19 @@ async def test_answer_service_answers_question_from_document_chunks() -> None:
         question="When did Atlas start?",
         chunks=[chunk],
     )
+    verify_answer.assert_awaited_once_with(
+        question="When did Atlas start?",
+        answer="Atlas started on March 14, 2025.",
+        chunks=[chunk],
+    )
     create_history.assert_awaited_once_with(
         user_id=1,
         document_id=20,
         question="When did Atlas start?",
         answer="Atlas started on March 14, 2025.",
+        verification_verdict=VerificationVerdict.SUPPORTED,
     )
     commit.assert_awaited_once_with()
     assert result.answer == "Atlas started on March 14, 2025."
     assert result.chunks == [chunk]
+    assert result.verification_verdict == VerificationVerdict.SUPPORTED
