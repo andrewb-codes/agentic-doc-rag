@@ -22,6 +22,7 @@ api = [
   "openai>=1.0",
   "limits[redis]>=5.8,<6",
   "redis>=5.0",
+  "aiogram>=3.0",
 ]
 
 all = [

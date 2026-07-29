@@ -58,8 +58,8 @@ async def test_answer_verification_service_verifies_answer() -> None:
     assert verdict == VerificationVerdict.SUPPORTED
 
 
-async def test_answer_verification_service_returns_unsupported_without_chunks() -> None:
-    verify_answer = AsyncMock()
+async def test_answer_verification_service_verifies_answer_without_chunks() -> None:
+    verify_answer = AsyncMock(return_value="unsupported")
 
     service = AnswerVerificationService(
         chat_service=cast(
@@ -74,5 +74,9 @@ async def test_answer_verification_service_returns_unsupported_without_chunks() 
         chunks=[],
     )
 
+    verify_answer.assert_awaited_once_with(
+        question="When did Atlas start?",
+        answer="Answer not found in documents.",
+        chunks=[],
+    )
     assert verdict == VerificationVerdict.UNSUPPORTED
-    verify_answer.assert_not_awaited()

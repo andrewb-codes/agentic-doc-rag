@@ -15,6 +15,9 @@ class Settings(BaseSettings):
 
     internal_api_key: str
 
+    telegram_bot_token: str | None = None
+    api_base_url: str = "http://127.0.0.1:8000"
+
     max_upload_size_bytes: int = 10 * 1024 * 1024
 
     qdrant_url: str = "http://localhost:6333"

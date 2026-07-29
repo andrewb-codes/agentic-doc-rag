@@ -8,6 +8,9 @@ from agentic_rag.services.llm import OpenAIChatService
 from agentic_rag.services.retrieval import RetrievalService
 from agentic_rag.services.verification import AnswerVerificationService
 
+NO_USER_ANSWER_FOUND = "Ответ не найден в документах."
+NO_DOCUMENT_ANSWER_FOUND = "Ответ не найден в документе."
+
 
 @dataclass(frozen=True)
 class AnswerResult:
@@ -45,12 +48,10 @@ class AnswerService:
             limit=limit,
         )
 
-        answer = await self.chat_service.answer_question(question=question, chunks=chunks)
-
-        verification_verdict = await self.verification_service.verify_answer(
+        answer, verification_verdict = await self._build_answer(
             question=question,
-            answer=answer,
             chunks=chunks,
+            no_answer_text=NO_USER_ANSWER_FOUND,
         )
 
         await self.qa_history_repository.create(
@@ -84,12 +85,10 @@ class AnswerService:
             limit=limit,
         )
 
-        answer = await self.chat_service.answer_question(question=question, chunks=chunks)
-
-        verification_verdict = await self.verification_service.verify_answer(
+        answer, verification_verdict = await self._build_answer(
             question=question,
-            answer=answer,
             chunks=chunks,
+            no_answer_text=NO_DOCUMENT_ANSWER_FOUND,
         )
 
         await self.qa_history_repository.create(
@@ -107,3 +106,22 @@ class AnswerService:
             chunks=chunks,
             verification_verdict=verification_verdict,
         )
+
+    async def _build_answer(
+        self,
+        *,
+        question: str,
+        chunks: list[DocumentChunk],
+        no_answer_text: str,
+    ) -> tuple[str, VerificationVerdict]:
+        if not chunks:
+            return no_answer_text, VerificationVerdict.UNSUPPORTED
+
+        answer = await self.chat_service.answer_question(question=question, chunks=chunks)
+        verification_verdict = await self.verification_service.verify_answer(
+            question=question,
+            answer=answer,
+            chunks=chunks,
+        )
+
+        return answer, verification_verdict

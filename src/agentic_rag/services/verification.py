@@ -13,9 +13,6 @@ class AnswerVerificationService:
         answer: str,
         chunks: list[DocumentChunk],
     ) -> VerificationVerdict:
-        if not chunks:
-            return VerificationVerdict.UNSUPPORTED
-
         verdict = await self.chat_service.verify_answer(
             question=question,
             answer=answer,
