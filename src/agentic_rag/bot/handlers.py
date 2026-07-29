@@ -7,6 +7,15 @@ from aiogram.types import Message
 
 from agentic_rag.bot.client import BackendClient, TelegramUser
 
+HELP_TEXT = (
+    "Пришли PDF-документ, я обработаю его и смогу отвечать на вопросы по содержимому.\n\n"
+    "Команды:\n"
+    "/documents — список загруженных документов\n"
+    "/history — последние вопросы и ответы\n"
+    "/status — текущее состояние\n"
+    "/help — справка"
+)
+
 
 def build_router(*, backend: BackendClient) -> Router:
     router = Router()
@@ -35,10 +44,27 @@ def build_router(*, backend: BackendClient) -> Router:
         return "Не удалось выполнить запрос."
 
     @router.message(CommandStart())
-    async def start(message: Message) -> None:
+    async def start_command(message: Message) -> None:
+        await message.answer(HELP_TEXT)
+
+    @router.message(Command("help"))
+    async def help_command(message: Message) -> None:
+        await message.answer(HELP_TEXT)
+
+    @router.message(Command("status"))
+    async def status_command(message: Message) -> None:
+        try:
+            user = current_user(message)
+            documents = await backend.list_documents(user=user)
+            history = await backend.list_history(user=user)
+        except httpx.HTTPStatusError as exc:
+            await message.answer(backend_error_text(exc))
+            return
+
         await message.answer(
-            "Пришли PDF-документ, я обработаю его и смогу отвечать на вопросы по содержимому.\n\n"
-            "Если документ уже загружен, просто напиши вопрос."
+            f"Документов: {len(documents)}\n"
+            f"Вопросов в истории: {len(history)}\n\n"
+            "Пришли PDF или задай вопрос по загруженным документам."
         )
 
     @router.message(Command("documents"))
@@ -71,7 +97,9 @@ def build_router(*, backend: BackendClient) -> Router:
             await message.answer("История вопросов пока пустая.")
             return
 
-        text = "\n\n".join(f"Q: {item['question']}\nA: {item['answer']}" for item in history[:5])
+        text = "\n\n".join(
+            f"Q: {item['question']}\nA: {item['answer']}" for item in reversed(history[:5])
+        )
         await message.answer(text)
 
     @router.message(F.document)
