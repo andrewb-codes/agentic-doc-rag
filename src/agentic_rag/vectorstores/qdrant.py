@@ -3,11 +3,15 @@ from typing import Protocol
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
+    CollectionInfo,
+    CollectionsResponse,
+    Condition,
     Distance,
     FieldCondition,
     Filter,
     MatchValue,
     PointStruct,
+    QueryResponse,
     VectorParams,
 )
 
@@ -25,10 +29,10 @@ class VectorSizeMismatchError(Exception):
 
 
 class QdrantClient(Protocol):
-    async def get_collections(self) -> object:
+    async def get_collections(self) -> CollectionsResponse:
         pass
 
-    async def get_collection(self, *, collection_name: str) -> object:
+    async def get_collection(self, *, collection_name: str) -> CollectionInfo:
         pass
 
     async def create_collection(
@@ -49,7 +53,7 @@ class QdrantClient(Protocol):
         query: list[float],
         query_filter: Filter,
         limit: int,
-    ) -> object:
+    ) -> QueryResponse:
         pass
 
     async def close(self) -> None:
@@ -81,7 +85,14 @@ class QdrantVectorStore:
 
         if self.collection_name in collection_names:
             collection = await self.client.get_collection(collection_name=self.collection_name)
-            existing_vector_size = collection.config.params.vectors.size
+            vectors_config = collection.config.params.vectors
+
+            if vectors_config is None or isinstance(vectors_config, dict):
+                raise VectorSizeMismatchError(
+                    f"qdrant collection '{self.collection_name}' uses unsupported vector config"
+                )
+
+            existing_vector_size = vectors_config.size
 
             if existing_vector_size != vector_size:
                 raise VectorSizeMismatchError(
@@ -137,7 +148,7 @@ class QdrantVectorStore:
         limit: int,
         document_id: int | None = None,
     ) -> list[VectorSearchResult]:
-        filter_conditions = [
+        filter_conditions: list[Condition] = [
             FieldCondition(
                 key="owner_id",
                 match=MatchValue(value=owner_id),
@@ -161,13 +172,19 @@ class QdrantVectorStore:
             limit=limit,
         )
 
-        return [
-            VectorSearchResult(
-                chunk_id=int(point.payload["chunk_id"]),
-                score=float(point.score),
+        results: list[VectorSearchResult] = []
+        for point in response.points:
+            if point.payload is None:
+                continue
+
+            results.append(
+                VectorSearchResult(
+                    chunk_id=int(point.payload["chunk_id"]),
+                    score=float(point.score),
+                )
             )
-            for point in response.points
-        ]
+
+        return results
 
     async def close(self) -> None:
         await self.client.close()
