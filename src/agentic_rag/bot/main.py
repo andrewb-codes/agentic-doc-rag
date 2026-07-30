@@ -2,6 +2,7 @@ import asyncio
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from agentic_rag.bot.client import BackendClient
 from agentic_rag.bot.handlers import build_router
@@ -22,7 +23,7 @@ async def main() -> None:
         base_url=settings.api_base_url,
         internal_api_key=settings.internal_api_key,
     )
-    dispatcher = Dispatcher()
+    dispatcher = Dispatcher(storage=MemoryStorage())
     dispatcher.include_router(build_router(backend=backend))
 
     try:

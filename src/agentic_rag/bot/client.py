@@ -71,6 +71,22 @@ class BackendClient:
         response.raise_for_status()
         return self._json_object(response)
 
+    async def ask_document(
+        self,
+        *,
+        user: TelegramUser,
+        document_id: int,
+        question: str,
+        limit: int = 5,
+    ) -> dict[str, Any]:
+        response = await self.client.post(
+            f"{self.base_url}/documents/{document_id}/ask",
+            headers=self._headers(user=user),
+            json={"question": question, "limit": limit},
+        )
+        response.raise_for_status()
+        return self._json_object(response)
+
     def _headers(self, *, user: TelegramUser) -> dict[str, str]:
         headers = {
             "X-Internal-API-Key": self.internal_api_key,
