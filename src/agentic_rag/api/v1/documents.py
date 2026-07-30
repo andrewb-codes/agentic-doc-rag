@@ -117,6 +117,15 @@ async def ask_documents(
     return build_document_ask_response(result)
 
 
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_document(
+    document_id: Annotated[int, Path(gt=0)],
+    current_user: Annotated[User, Depends(get_current_telegram_user)],
+    service: Annotated[DocumentMetadataService, Depends(get_document_metadata_service)],
+) -> None:
+    await service.delete_user_document(document_id=document_id, owner_id=current_user.id)
+
+
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: Annotated[int, Path(gt=0)],

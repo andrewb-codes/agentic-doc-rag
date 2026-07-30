@@ -46,3 +46,7 @@ class DocumentRepository:
         document.chunk_count = chunk_count
         await self.session.flush()
         return document
+
+    async def delete(self, *, document: Document) -> None:
+        await self.session.delete(document)
+        await self.session.flush()

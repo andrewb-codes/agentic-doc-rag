@@ -41,6 +41,11 @@ class DocumentMetadataService:
         await self.session.refresh(document)
         return document
 
+    async def delete_user_document(self, *, document_id: int, owner_id: int) -> None:
+        document = await self.get_user_document(document_id=document_id, owner_id=owner_id)
+        await self.document_repository.delete(document=document)
+        await self.session.commit()
+
 
 class DocumentProcessingService:
     def __init__(

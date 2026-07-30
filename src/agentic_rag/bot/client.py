@@ -87,6 +87,13 @@ class BackendClient:
         response.raise_for_status()
         return self._json_object(response)
 
+    async def delete_document(self, *, user: TelegramUser, document_id: int) -> None:
+        response = await self.client.delete(
+            f"{self.base_url}/documents/{document_id}",
+            headers=self._headers(user=user),
+        )
+        response.raise_for_status()
+
     def _headers(self, *, user: TelegramUser) -> dict[str, str]:
         headers = {
             "X-Internal-API-Key": self.internal_api_key,

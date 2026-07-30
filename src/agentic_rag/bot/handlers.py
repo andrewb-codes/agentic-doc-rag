@@ -18,7 +18,14 @@ from aiogram.types import (
 
 from agentic_rag.bot.client import BackendClient, TelegramUser
 
-HELP_TEXT = "Пришли PDF-документ, я обработаю его и смогу отвечать на вопросы по содержимому."
+HELP_TEXT = (
+    "Пришли PDF-документ, я обработаю его и смогу отвечать на вопросы.\n\n"
+    "📄 Документы – список, выбор активного документа и удаление.\n"
+    "📜 История – последние вопросы и ответы.\n"
+    "📊 Статус – количество сохраненных документов и вопросов.\n\n"
+    "Если выбран активный документ, вопросы идут только по нему. "
+    "Если выбраны все документы, поиск идет по всем загруженным."
+)
 
 DOCUMENTS_BUTTON = "📄 Документы"
 HISTORY_BUTTON = "📜 История"
@@ -43,6 +50,7 @@ ACTIVE_DOCUMENT_ID_KEY = "active_document_id"
 ACTIVE_DOCUMENT_FILENAME_KEY = "active_document_filename"
 SELECT_DOCUMENT_PREFIX = "select_document:"
 CLEAR_DOCUMENT_CALLBACK = "clear_document"
+DELETE_DOCUMENT_PREFIX = "delete_document:"
 
 
 def build_router(*, backend: BackendClient) -> Router:
@@ -74,25 +82,61 @@ def build_router(*, backend: BackendClient) -> Router:
 
         return "Не удалось выполнить запрос."
 
-    def build_documents_keyboard(documents: list[dict[str, Any]]) -> InlineKeyboardMarkup:
-        buttons = [
-            [
-                InlineKeyboardButton(
-                    text=f"Выбрать {index}",
-                    callback_data=f"{SELECT_DOCUMENT_PREFIX}{document['id']}",
-                )
-            ]
-            for index, document in enumerate(documents, start=1)
-        ]
+    def backend_request_error_text() -> str:
+        return "Backend сейчас недоступен. Попробуй позже."
+
+    def build_documents_keyboard(
+        documents: list[dict[str, Any]],
+        active_document_id: int | None,
+    ) -> InlineKeyboardMarkup:
+        buttons = []
+        for index, document in enumerate(documents, start=1):
+            is_active = document["id"] == active_document_id
+            buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=f"{'✅ Выбран' if is_active else 'Выбрать'} {index}",
+                        callback_data=f"{SELECT_DOCUMENT_PREFIX}{document['id']}",
+                    ),
+                    InlineKeyboardButton(
+                        text=f"Удалить {index}",
+                        callback_data=f"{DELETE_DOCUMENT_PREFIX}{document['id']}",
+                    ),
+                ]
+            )
+
         buttons.append(
             [
                 InlineKeyboardButton(
-                    text="Все документы",
+                    text="✅ Все документы" if active_document_id is None else "Все документы",
                     callback_data=CLEAR_DOCUMENT_CALLBACK,
                 )
             ]
         )
+
         return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+    def documents_list_text(
+        documents: list[dict[str, Any]],
+        active_document_id: int | None,
+    ) -> str:
+        lines = [
+            f"{index}. {'✅ ' if document['id'] == active_document_id else ''}"
+            f"{document['filename']} ({document['status']})"
+            for index, document in enumerate(documents, start=1)
+        ]
+
+        if active_document_id is None:
+            lines.append("\nСейчас выбраны: все документы")
+        else:
+            active_document = next(
+                (document for document in documents if document["id"] == active_document_id),
+                None,
+            )
+            if active_document is not None:
+                lines.append(f"\nСейчас выбран: {active_document['filename']}")
+
+        return "\n".join(lines)
 
     async def answer_callback_message(callback: CallbackQuery, text: str) -> None:
         if callback.message is None or isinstance(callback.message, InaccessibleMessage):
@@ -101,6 +145,35 @@ def build_router(*, backend: BackendClient) -> Router:
 
         await callback.message.answer(text)
         await callback.answer()
+
+    async def edit_documents_message(
+        callback: CallbackQuery,
+        documents: list[dict[str, Any]],
+        active_document_id: int | None,
+    ) -> None:
+        if callback.message is None or isinstance(callback.message, InaccessibleMessage):
+            await callback.answer()
+            return
+
+        await callback.message.edit_text(
+            documents_list_text(documents, active_document_id),
+            reply_markup=build_documents_keyboard(documents, active_document_id),
+        )
+
+    async def edit_or_clear_documents_message(
+        callback: CallbackQuery,
+        documents: list[dict[str, Any]],
+        active_document_id: int | None,
+    ) -> None:
+        if callback.message is None or isinstance(callback.message, InaccessibleMessage):
+            await callback.answer()
+            return
+
+        if not documents:
+            await callback.message.edit_text("Документы пока не загружены.", reply_markup=None)
+            return
+
+        await edit_documents_message(callback, documents, active_document_id)
 
     @router.message(CommandStart())
     async def start_command(message: Message) -> None:
@@ -113,7 +186,7 @@ def build_router(*, backend: BackendClient) -> Router:
 
     @router.message(Command("status"))
     @router.message(F.text == STATUS_BUTTON)
-    async def status_command(message: Message) -> None:
+    async def status_command(message: Message, state: FSMContext) -> None:
         try:
             user = current_user(message)
             documents = await backend.list_documents(user=user)
@@ -121,9 +194,21 @@ def build_router(*, backend: BackendClient) -> Router:
         except httpx.HTTPStatusError as exc:
             await message.answer(backend_error_text(exc))
             return
+        except httpx.RequestError:
+            await message.answer(backend_request_error_text())
+            return
+
+        state_data = await state.get_data()
+        active_document_filename = state_data.get(ACTIVE_DOCUMENT_FILENAME_KEY)
+
+        active_scope = (
+            f"Активный документ: {active_document_filename}"
+            if active_document_filename is not None
+            else "Активный режим: все документы"
+        )
 
         await message.answer(
-            f"Документов: {len(documents)}\nВопросов в истории: {len(history)}\n\n"
+            f"Документов: {len(documents)}\nВопросов в истории: {len(history)}\n\n{active_scope}"
         )
 
     @router.message(Command("history"))
@@ -133,6 +218,9 @@ def build_router(*, backend: BackendClient) -> Router:
             history = await backend.list_history(user=current_user(message))
         except httpx.HTTPStatusError as exc:
             await message.answer(backend_error_text(exc))
+            return
+        except httpx.RequestError:
+            await message.answer(backend_request_error_text())
             return
 
         if not history:
@@ -146,22 +234,30 @@ def build_router(*, backend: BackendClient) -> Router:
 
     @router.message(Command("documents"))
     @router.message(F.text == DOCUMENTS_BUTTON)
-    async def list_documents(message: Message) -> None:
+    async def list_documents(message: Message, state: FSMContext) -> None:
         try:
             documents = await backend.list_documents(user=current_user(message))
         except httpx.HTTPStatusError as exc:
             await message.answer(backend_error_text(exc))
+            return
+        except httpx.RequestError:
+            await message.answer(backend_request_error_text())
             return
 
         if not documents:
             await message.answer("Документы пока не загружены.")
             return
 
-        text = "\n".join(
-            f"{index}. {document['filename']} ({document['status']})"
-            for index, document in enumerate(documents, start=1)
+        state_data = await state.get_data()
+        active_document_id = state_data.get(ACTIVE_DOCUMENT_ID_KEY)
+        active_document_id = (
+            int(cast(str, active_document_id)) if active_document_id is not None else None
         )
-        await message.answer(text, reply_markup=build_documents_keyboard(documents))
+
+        await message.answer(
+            documents_list_text(documents, active_document_id),
+            reply_markup=build_documents_keyboard(documents, active_document_id),
+        )
 
     @router.callback_query(F.data.startswith(SELECT_DOCUMENT_PREFIX))
     async def select_document(callback: CallbackQuery, state: FSMContext) -> None:
@@ -176,6 +272,9 @@ def build_router(*, backend: BackendClient) -> Router:
         except httpx.HTTPStatusError as exc:
             await answer_callback_message(callback, backend_error_text(exc))
             return
+        except httpx.RequestError:
+            await answer_callback_message(callback, backend_request_error_text())
+            return
 
         selected_document = next(
             (document for document in documents if document["id"] == document_id),
@@ -186,28 +285,81 @@ def build_router(*, backend: BackendClient) -> Router:
             await answer_callback_message(callback, "Документ не найден.")
             return
 
+        state_data = await state.get_data()
+        current_active_document_id = state_data.get(ACTIVE_DOCUMENT_ID_KEY)
+
+        if (
+            current_active_document_id is not None
+            and int(cast(str, current_active_document_id)) == document_id
+        ):
+            await callback.answer("Документ уже выбран.")
+            return
+
         await state.update_data(
             active_document_id=selected_document["id"],
             active_document_filename=selected_document["filename"],
         )
 
-        await answer_callback_message(
-            callback,
-            f"Активный документ: {selected_document['filename']}\n"
-            "Теперь вопросы будут идти только по нему.",
-        )
+        await edit_documents_message(callback, documents, selected_document["id"])
+        await callback.answer("Документ выбран.")
 
     @router.callback_query(F.data == CLEAR_DOCUMENT_CALLBACK)
     async def clear_document(callback: CallbackQuery, state: FSMContext) -> None:
-        await state.clear()
+        state_data = await state.get_data()
+        active_document_id = state_data.get(ACTIVE_DOCUMENT_ID_KEY)
 
-        await answer_callback_message(
-            callback,
-            "Активный документ сброшен. Вопросы будут идти по всем документам.",
+        if active_document_id is None:
+            await callback.answer("Уже выбраны все документы.")
+            return
+
+        user = telegram_user_from_aiogram_user(callback.from_user)
+
+        try:
+            documents = await backend.list_documents(user=user)
+        except httpx.HTTPStatusError as exc:
+            await answer_callback_message(callback, backend_error_text(exc))
+            return
+        except httpx.RequestError:
+            await answer_callback_message(callback, backend_request_error_text())
+            return
+
+        await state.clear()
+        await edit_documents_message(callback, documents, None)
+        await callback.answer("Выбраны все документы.")
+
+    @router.callback_query(F.data.startswith(DELETE_DOCUMENT_PREFIX))
+    async def delete_document(callback: CallbackQuery, state: FSMContext) -> None:
+        if callback.data is None:
+            return
+
+        document_id = int(callback.data.removeprefix(DELETE_DOCUMENT_PREFIX))
+        user = telegram_user_from_aiogram_user(callback.from_user)
+
+        try:
+            await backend.delete_document(user=user, document_id=document_id)
+            documents = await backend.list_documents(user=user)
+        except httpx.HTTPStatusError as exc:
+            await answer_callback_message(callback, backend_error_text(exc))
+            return
+        except httpx.RequestError:
+            await answer_callback_message(callback, backend_request_error_text())
+            return
+
+        state_data = await state.get_data()
+        active_document_id = state_data.get(ACTIVE_DOCUMENT_ID_KEY)
+        active_document_id = (
+            int(cast(str, active_document_id)) if active_document_id is not None else None
         )
 
+        if active_document_id == document_id:
+            await state.clear()
+            active_document_id = None
+
+        await edit_or_clear_documents_message(callback, documents, active_document_id)
+        await callback.answer("Документ удален.")
+
     @router.message(F.document)
-    async def upload_document(message: Message, bot: Bot) -> None:
+    async def upload_document(message: Message, bot: Bot, state: FSMContext) -> None:
         document = message.document
 
         if document is None:
@@ -241,14 +393,21 @@ def build_router(*, backend: BackendClient) -> Router:
         except httpx.HTTPStatusError as exc:
             await status_message.edit_text(backend_error_text(exc))
             return
+        except httpx.RequestError:
+            await status_message.edit_text(backend_request_error_text())
+            return
+
+        await state.update_data(
+            active_document_id=result["id"],
+            active_document_filename=result["filename"],
+        )
 
         await status_message.edit_text(
             f"Документ готов: {result['filename']}\n"
             f"Страниц: {result['page_count']}\n"
             f"Фрагментов: {result['chunk_count']}\n\n"
-            "Теперь можешь задать вопрос по документу."
+            "Я выбрал этот документ активным. Теперь можешь задавать вопросы по нему."
         )
-        await message.answer("Выбери действие или задай вопрос.", reply_markup=MAIN_KEYBOARD)
 
     @router.message(F.text)
     async def ask_documents(message: Message, state: FSMContext) -> None:
@@ -282,6 +441,9 @@ def build_router(*, backend: BackendClient) -> Router:
                 )
         except httpx.HTTPStatusError as exc:
             await status_message.edit_text(backend_error_text(exc))
+            return
+        except httpx.RequestError:
+            await status_message.edit_text(backend_request_error_text())
             return
 
         await status_message.edit_text(result["answer"])
