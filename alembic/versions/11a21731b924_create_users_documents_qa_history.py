@@ -28,7 +28,6 @@ document_status_enum = postgresql.ENUM(
 )
 
 verification_verdict_enum = postgresql.ENUM(
-    "not_verified",
     "supported",
     "unsupported",
     name="verification_verdict",
@@ -78,6 +77,9 @@ def upgrade() -> None:
         sa.Column("question", sa.Text(), nullable=False),
         sa.Column("answer", sa.Text(), nullable=False),
         sa.Column("verification_verdict", verification_verdict_enum, nullable=False),
+        sa.Column("unsupported_claims", sa.JSON(), nullable=False),
+        sa.Column("missing_information", sa.JSON(), nullable=False),
+        sa.Column("verification_confidence", sa.Float(), nullable=True),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(["document_id"], ["documents.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),

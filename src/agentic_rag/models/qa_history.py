@@ -4,7 +4,7 @@ import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Text, func
+from sqlalchemy import JSON, BigInteger, DateTime, Enum, Float, ForeignKey, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from agentic_rag.db.base import Base
@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 
 
 class VerificationVerdict(enum.StrEnum):
-    NOT_VERIFIED = "not_verified"
     SUPPORTED = "supported"
     UNSUPPORTED = "unsupported"
 
@@ -46,6 +45,10 @@ class QAHistory(Base):
         ),
         nullable=False,
     )
+    unsupported_claims: Mapped[list[dict[str, str]]] = mapped_column(JSON, nullable=False)
+    missing_information: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    verification_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )

@@ -36,7 +36,12 @@ async def test_list_user_qa_history_returns_current_user_history(
     assert body[0]["document_id"] == 1
     assert body[0]["question"] == "When did Atlas start?"
     assert body[0]["answer"] == "Atlas started on March 14, 2025."
-    assert body[0]["verification_verdict"] == "not_verified"
+    assert body[0]["verification_result"] == {
+        "verdict": "unsupported",
+        "unsupported_claims": [],
+        "missing_information": [],
+        "confidence": 0.0,
+    }
     assert body[0]["created_at"]
 
 

@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentic_rag.models import Document, DocumentStatus, QAHistory, User, VerificationVerdict
 from agentic_rag.repositories.qa_history import QAHistoryRepository
+from agentic_rag.services.verification import VerificationResult
 
 
 async def create_user(
@@ -40,12 +41,20 @@ async def create_qa_history(
     document_id: int | None = None,
     question: str = "Question?",
     answer: str = "Answer.",
-    verification_verdict: VerificationVerdict = VerificationVerdict.NOT_VERIFIED,
+    verification_result: VerificationResult | None = None,
 ) -> QAHistory:
+    if verification_result is None:
+        verification_result = VerificationResult(
+            verdict=VerificationVerdict.UNSUPPORTED,
+            unsupported_claims=[],
+            missing_information=[],
+            confidence=0.0,
+        )
+
     return await QAHistoryRepository(session=session).create(
         user_id=user_id,
         document_id=document_id,
         question=question,
         answer=answer,
-        verification_verdict=verification_verdict,
+        verification_result=verification_result,
     )

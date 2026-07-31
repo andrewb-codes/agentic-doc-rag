@@ -71,7 +71,7 @@ class OpenAIChatService:
                 answer=answer,
                 chunks=chunks,
             ),
-            max_tokens=16,
+            max_tokens=300,
         )
 
         return response.choices[0].message.content or ""
@@ -134,13 +134,25 @@ def build_verification_messages(
         "role": "system",
         "content": (
             "You verify whether an answer is fully supported by the provided context. "
-            "Return exactly one word: supported or unsupported."
+            "Return only valid JSON with this exact shape: "
+            '{"verdict":"supported|unsupported",'
+            '"unsupported_claims":[{"claim":"...","reason":"..."}],'
+            '"missing_information":["..."],'
+            '"confidence":0.0|null}. '
+            "Use verdict='supported' only when every factual claim in the answer is supported by the context. "
+            "Put each unsupported factual claim into unsupported_claims with a short user-facing reason. "
+            "Put information needed to answer the question but absent from the context into missing_information. "
+            "confidence must be a number from 0 to 1, or null when confidence cannot be estimated. "
+            "Do not include markdown, code fences, or extra text."
         ),
     }
     user_message: ChatCompletionUserMessageParam = {
         "role": "user",
         "content": (
-            f"Question:\n{question}\n\nAnswer:\n{answer}\n\nContext:\n{context}\n\nVerdict:"
+            f"Question:\n{question}\n\n"
+            f"Answer:\n{answer}\n\n"
+            f"Context:\n{context}\n\n"
+            "Return the verification JSON:"
         ),
     }
 

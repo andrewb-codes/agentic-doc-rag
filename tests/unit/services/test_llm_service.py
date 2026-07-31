@@ -127,6 +127,7 @@ def test_build_verification_messages_includes_question_answer_and_chunks() -> No
     )
 
     assert messages[0]["role"] == "system"
+    assert '"unsupported_claims":[{"claim":"...","reason":"..."}]' in messages[0]["content"]
     assert messages[1]["role"] == "user"
     assert "When did Atlas start?" in messages[1]["content"]
     assert "Atlas started on March 14, 2025." in messages[1]["content"]
@@ -172,6 +173,6 @@ async def test_openai_chat_service_sends_verification_messages_and_returns_verdi
             answer="Atlas started on March 14, 2025.",
             chunks=[chunk],
         ),
-        max_tokens=16,
+        max_tokens=300,
     )
     assert verdict == "supported"
