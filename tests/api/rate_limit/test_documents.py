@@ -5,13 +5,14 @@ from httpx import AsyncClient
 from agentic_rag.api.deps import get_answer_service, get_retrieval_service
 from agentic_rag.api.main import app
 from agentic_rag.db.session import AsyncSessionLocal
-from agentic_rag.models import VerificationVerdict
+from agentic_rag.models import AnswerStatus, VerificationVerdict
 from agentic_rag.rate_limit.rules import (
     DOCUMENT_ASK_LIMIT,
     DOCUMENT_SEARCH_LIMIT,
     DOCUMENT_UPLOAD_LIMIT,
 )
 from agentic_rag.services.answer import AnswerResult
+from agentic_rag.services.verification import VerificationResult
 from tests.helpers import (
     FakeRateLimitService,
     create_document,
@@ -26,15 +27,27 @@ class FakeAnswerService:
         self.answer_user_question = AsyncMock(
             return_value=AnswerResult(
                 answer="No answer.",
+                answer_status=AnswerStatus.NOT_FOUND,
                 chunks=[],
-                verification_verdict=VerificationVerdict.UNSUPPORTED,
+                verification_result=VerificationResult(
+                    verdict=VerificationVerdict.UNSUPPORTED,
+                    unsupported_claims=[],
+                    missing_information=[],
+                    confidence=None,
+                ),
             )
         )
         self.answer_document_question = AsyncMock(
             return_value=AnswerResult(
                 answer="No answer.",
+                answer_status=AnswerStatus.NOT_FOUND,
                 chunks=[],
-                verification_verdict=VerificationVerdict.UNSUPPORTED,
+                verification_result=VerificationResult(
+                    verdict=VerificationVerdict.UNSUPPORTED,
+                    unsupported_claims=[],
+                    missing_information=[],
+                    confidence=None,
+                ),
             )
         )
 

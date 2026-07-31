@@ -2,11 +2,11 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agentic_rag.models import DocumentChunk, VerificationVerdict
+from agentic_rag.models import AnswerStatus, DocumentChunk, VerificationVerdict
 from agentic_rag.repositories.qa_history import QAHistoryRepository
 from agentic_rag.services.llm import OpenAIChatService
 from agentic_rag.services.retrieval import RetrievalService
-from agentic_rag.services.verification import AnswerVerificationService
+from agentic_rag.services.verification import AnswerVerificationService, VerificationResult
 
 NO_USER_ANSWER_FOUND = "Ответ не найден в документах."
 NO_DOCUMENT_ANSWER_FOUND = "Ответ не найден в документе."
@@ -15,8 +15,9 @@ NO_DOCUMENT_ANSWER_FOUND = "Ответ не найден в документе."
 @dataclass(frozen=True)
 class AnswerResult:
     answer: str
+    answer_status: AnswerStatus
     chunks: list[DocumentChunk]
-    verification_verdict: VerificationVerdict
+    verification_result: VerificationResult
 
 
 class AnswerService:
@@ -48,7 +49,7 @@ class AnswerService:
             limit=limit,
         )
 
-        answer, verification_verdict = await self._build_answer(
+        answer, answer_status, verification_result = await self._build_answer(
             question=question,
             chunks=chunks,
             no_answer_text=NO_USER_ANSWER_FOUND,
@@ -59,15 +60,16 @@ class AnswerService:
             document_id=None,
             question=question,
             answer=answer,
-            verification_verdict=verification_verdict,
+            verification_result=verification_result,
         )
 
         await self.session.commit()
 
         return AnswerResult(
             answer=answer,
+            answer_status=answer_status,
             chunks=chunks,
-            verification_verdict=verification_verdict,
+            verification_result=verification_result,
         )
 
     async def answer_document_question(
@@ -85,7 +87,7 @@ class AnswerService:
             limit=limit,
         )
 
-        answer, verification_verdict = await self._build_answer(
+        answer, answer_status, verification_result = await self._build_answer(
             question=question,
             chunks=chunks,
             no_answer_text=NO_DOCUMENT_ANSWER_FOUND,
@@ -96,15 +98,16 @@ class AnswerService:
             document_id=document_id,
             question=question,
             answer=answer,
-            verification_verdict=verification_verdict,
+            verification_result=verification_result,
         )
 
         await self.session.commit()
 
         return AnswerResult(
             answer=answer,
+            answer_status=answer_status,
             chunks=chunks,
-            verification_verdict=verification_verdict,
+            verification_result=verification_result,
         )
 
     async def _build_answer(
@@ -113,15 +116,37 @@ class AnswerService:
         question: str,
         chunks: list[DocumentChunk],
         no_answer_text: str,
-    ) -> tuple[str, VerificationVerdict]:
+    ) -> tuple[str, AnswerStatus, VerificationResult]:
         if not chunks:
-            return no_answer_text, VerificationVerdict.UNSUPPORTED
+            return (
+                no_answer_text,
+                AnswerStatus.NOT_FOUND,
+                VerificationResult(
+                    verdict=VerificationVerdict.UNSUPPORTED,
+                    unsupported_claims=[],
+                    missing_information=["No relevant document chunks found."],
+                    confidence=None,
+                ),
+            )
 
         answer = await self.chat_service.answer_question(question=question, chunks=chunks)
-        verification_verdict = await self.verification_service.verify_answer(
+        answer_status = (
+            AnswerStatus.NOT_FOUND if is_no_answer_text(answer) else AnswerStatus.ANSWERED
+        )
+        verification_result = await self.verification_service.verify_answer(
             question=question,
             answer=answer,
             chunks=chunks,
         )
 
-        return answer, verification_verdict
+        return answer, answer_status, verification_result
+
+
+def is_no_answer_text(answer: str) -> bool:
+    normalized = answer.strip().casefold()
+    return (
+        "не найден" in normalized
+        or "не удалось найти" in normalized
+        or "not found" in normalized
+        or "does not contain the answer" in normalized
+    )
