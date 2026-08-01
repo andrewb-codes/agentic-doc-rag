@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import sys
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
@@ -8,8 +10,20 @@ from agentic_rag.bot.client import BackendClient
 from agentic_rag.bot.config import bot_settings
 from agentic_rag.bot.handlers import build_router
 
+logger = logging.getLogger(__name__)
+
+
+def configure_bot_logging() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        stream=sys.stdout,
+    )
+
 
 async def main() -> None:
+    configure_bot_logging()
+
     session = AiohttpSession()
     bot = Bot(token=bot_settings.telegram_bot_token, session=session)
 
@@ -21,10 +35,12 @@ async def main() -> None:
     dispatcher.include_router(build_router(backend=backend))
 
     try:
+        logger.info("Telegram bot polling started")
         await dispatcher.start_polling(bot)
     finally:
         await backend.close()
         await session.close()
+        logger.info("Telegram bot polling stopped")
 
 
 if __name__ == "__main__":
