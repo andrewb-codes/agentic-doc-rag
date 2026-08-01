@@ -22,11 +22,15 @@ api = [
   "openai>=1.0",
   "limits[redis]>=5.8,<6",
   "redis>=5.0",
+]
+
+bot = [
   "aiogram>=3.0",
+  "httpx>=0.27",
 ]
 
 all = [
-  "agentic-doc-rag[api]",
+  "agentic-doc-rag[api,bot]",
 ]
 
 [dependency-groups]

@@ -1,25 +1,18 @@
 from __future__ import annotations
 
-import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from agentic_rag.core.enums import DocumentStatus
 from agentic_rag.db.base import Base
 
 if TYPE_CHECKING:
     from agentic_rag.models.chunk import DocumentChunk
     from agentic_rag.models.qa_history import QAHistory
     from agentic_rag.models.user import User
-
-
-class DocumentStatus(enum.StrEnum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    PROCESSED = "processed"
-    FAILED = "failed"
 
 
 class Document(Base):

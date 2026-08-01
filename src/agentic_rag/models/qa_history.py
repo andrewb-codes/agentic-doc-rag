@@ -1,22 +1,17 @@
 from __future__ import annotations
 
-import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import JSON, BigInteger, DateTime, Enum, Float, ForeignKey, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from agentic_rag.core.enums import VerificationVerdict
 from agentic_rag.db.base import Base
 
 if TYPE_CHECKING:
     from agentic_rag.models.document import Document
     from agentic_rag.models.user import User
-
-
-class VerificationVerdict(enum.StrEnum):
-    SUPPORTED = "supported"
-    UNSUPPORTED = "unsupported"
 
 
 class QAHistory(Base):

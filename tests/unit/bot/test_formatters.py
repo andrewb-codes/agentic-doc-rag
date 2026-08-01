@@ -10,7 +10,7 @@ from agentic_rag.bot.formatters import (
     format_verification_details,
     split_telegram_text,
 )
-from agentic_rag.models import AnswerStatus, VerificationVerdict
+from agentic_rag.core.enums import AnswerStatus, VerificationVerdict
 
 
 def ask_response(

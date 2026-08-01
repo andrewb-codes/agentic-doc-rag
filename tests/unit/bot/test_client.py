@@ -13,7 +13,7 @@ from agentic_rag.bot.client import (
     BotVerificationResult,
     TelegramUser,
 )
-from agentic_rag.models import AnswerStatus, DocumentStatus, VerificationVerdict
+from agentic_rag.core.enums import AnswerStatus, DocumentStatus, VerificationVerdict
 
 
 def document_payload() -> dict[str, object]:

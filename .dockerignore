@@ -1,3 +1,7 @@
+.git
+.gitignore
+.dockerignore
+
 # Python bytecode and caches
 __pycache__/
 *.py[cod]
@@ -10,7 +14,6 @@ __pycache__/
 venv/
 env/
 ENV/
-.uv-cache/
 
 # Build and packaging artifacts
 build/
@@ -21,53 +24,41 @@ dist/
 MANIFEST
 
 # Test, coverage, lint and type-check caches
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
+.pytest_cache
+.ruff_cache
+.mypy_cache
 .pyre/
-.hypothesis/
 .coverage
 .coverage.*
 coverage.xml
 htmlcov/
-.junit/
-junit.xml
 .tox/
 .nox/
 
-# Local environment and secrets
+# Local env and secrets
 .env
 .env.*
 !.env.example
 !.env.test.example
-.envrc
 *.pem
 *.key
 *.crt
 
-# Runtime files and local data
+# Runtime files and local service data
 *.log
-logs/
 *.pid
-*.db
 *.sqlite
 *.sqlite3
 uploads/
 storage/
 tmp/
 temp/
-
-# Docker and local service data
 docker-data/
 postgres-data/
 qdrant-data/
 
-# Local tool artifacts
-.python-version
-alembic.ini.local
-
-# Jupyter
-.ipynb_checkpoints/
+# Project files not needed in runtime images
+tests/
 
 # IDEs and OS files
 .idea/

@@ -20,6 +20,7 @@ all = [
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "limits", extra = ["redis"] },
     { name = "openai" },
     { name = "psycopg", extra = ["binary"] },
@@ -32,7 +33,6 @@ all = [
     { name = "uvicorn", extra = ["standard"] },
 ]
 api = [
-    { name = "aiogram" },
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "fastapi" },
@@ -47,6 +47,10 @@ api = [
     { name = "structlog" },
     { name = "uvicorn", extra = ["standard"] },
 ]
+bot = [
+    { name = "aiogram" },
+    { name = "httpx" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -60,11 +64,12 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agentic-doc-rag", extras = ["api"], marker = "extra == 'all'" },
-    { name = "aiogram", marker = "extra == 'api'", specifier = ">=3.0" },
+    { name = "agentic-doc-rag", extras = ["api", "bot"], marker = "extra == 'all'" },
+    { name = "aiogram", marker = "extra == 'bot'", specifier = ">=3.0" },
     { name = "alembic", marker = "extra == 'api'", specifier = ">=1.13" },
     { name = "asyncpg", marker = "extra == 'api'", specifier = ">=0.29" },
     { name = "fastapi", marker = "extra == 'api'", specifier = ">=0.115" },
+    { name = "httpx", marker = "extra == 'bot'", specifier = ">=0.27" },
     { name = "limits", extras = ["redis"], marker = "extra == 'api'", specifier = ">=5.8,<6" },
     { name = "openai", marker = "extra == 'api'", specifier = ">=1.0" },
     { name = "psycopg", extras = ["binary"], marker = "extra == 'api'", specifier = ">=3.2" },
@@ -77,7 +82,7 @@ requires-dist = [
     { name = "structlog", marker = "extra == 'api'", specifier = ">=25.1" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'api'", specifier = ">=0.30" },
 ]
-provides-extras = ["api", "all"]
+provides-extras = ["api", "bot", "all"]
 
 [package.metadata.requires-dev]
 dev = [

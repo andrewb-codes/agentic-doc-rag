@@ -15,12 +15,9 @@ class Settings(BaseSettings):
 
     internal_api_key: str
 
-    telegram_bot_token: str | None = None
-    api_base_url: str = "http://127.0.0.1:8000"
-
     max_upload_size_bytes: int = 10 * 1024 * 1024
 
-    qdrant_url: str = "http://localhost:6333"
+    qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_collection: str = "document_chunks"
 
     embedding_api_key: str
@@ -33,7 +30,7 @@ class Settings(BaseSettings):
     llm_base_url: str | None = None
     llm_model: str = "gpt-4o-mini"
     llm_max_tokens: int = 1000
-    llm_timeout_seconds: float = 20.0
+    llm_timeout_seconds: float = 60.0
     llm_max_retries: int = 0
 
     rate_limit_enabled: bool = True

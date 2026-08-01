@@ -6,7 +6,7 @@ from agentic_rag.bot.client import (
     BotUnsupportedClaim,
     BotVerificationResult,
 )
-from agentic_rag.models import AnswerStatus, VerificationVerdict
+from agentic_rag.core.enums import AnswerStatus, VerificationVerdict
 
 TELEGRAM_MESSAGE_LIMIT = 4096
 SOURCE_QUOTE_LIMIT = 280

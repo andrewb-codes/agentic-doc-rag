@@ -1,8 +1,6 @@
 services:
   redis:
     image: redis:7.4-alpine
-    ports:
-      - "127.0.0.1:${REDIS_PORT:?REDIS_PORT is required}:6379"
     command:
       - redis-server
       - --appendonly
@@ -37,8 +35,6 @@ services:
 
   qdrant:
     image: qdrant/qdrant:v1.18.0
-    ports:
-      - "127.0.0.1:${QDRANT_PORT:?QDRANT_PORT is required}:6333"
     volumes:
       - rag_qdrant_data:/qdrant/storage
     healthcheck:
@@ -46,6 +42,40 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    env_file:
+      - .env
+    environment:
+      QDRANT_URL: "http://qdrant:6333"
+      RATE_LIMIT_REDIS_URL: "async+redis://redis:6379/0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)\"" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    environment:
+      INTERNAL_API_KEY: "${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}"
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}"
+      API_BASE_URL: "http://api:8000"
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   rag_postgres_data:

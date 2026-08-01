@@ -1,224 +1,305 @@
-# agentic-doc-rag
-Agentic Document RAG Assistant with Answer Verification
+# Agentic Doc RAG
 
-## План разработки
+Backend и Telegram-бот для вопросно-ответного поиска по PDF-документам. Проект
+реализует verified RAG pipeline: документ индексируется в Qdrant, ответ генерируется
+только по найденному контексту, а отдельный verifier-шаг проверяет, подтверждается ли
+ответ фрагментами документа.
 
-### Цель проекта
+## Возможности
 
-Сделать backend-сервис для вопросно-ответного поиска по техническим PDF-документам:
+- загрузка PDF через Telegram;
+- извлечение текста по страницам через PyMuPDF;
+- chunking с overlap и сохранением page/source metadata;
+- хранение пользователей, документов, чанков и истории вопросов в PostgreSQL;
+- OpenAI-compatible embeddings и LLM provider;
+- semantic search по Qdrant с фильтрацией по владельцу и документу;
+- ответы по одному активному документу или по всем документам пользователя;
+- verification verdict для каждого ответа: `supported` или `unsupported`;
+- история вопросов и ответов;
+- Telegram UI для загрузки, выбора и удаления документов;
+- rate limiting через Redis;
+- структурированное логирование запросов с `X-Request-ID`;
+- Docker Compose для API, bot, PostgreSQL, Redis и Qdrant;
+- pytest-покрытие сервисов, API, repositories, rate limiting и Telegram client.
 
-- загрузка PDF и извлечение текста
-- разбиение текста на чанки с сохранением номеров страниц;
-- vector search по фрагментам документа;
-- генерация ответа через LLM только на основе найденного контекста;
-- цитаты на использованные фрагменты;
-- отдельный verifier-шаг, который проверяет, подтверждается ли ответ найденными чанками.
+Основной стек: Python 3.13, FastAPI, aiogram 3, SQLAlchemy 2 async, PostgreSQL,
+Qdrant, Redis, Alembic, PyMuPDF, OpenAI SDK, structlog, Docker Compose и uv.
 
-Главная идея проекта: сделать не просто PDF chatbot, а verified RAG-систему, которая умеет находить неподтвержденные или слабо подтвержденные ответы.
+## Архитектура
 
-### Границы MVP
+FastAPI содержит бизнес-логику и RAG pipeline. Telegram-бот является отдельным
+HTTP-клиентом backend API и не обращается напрямую к PostgreSQL или Qdrant.
 
-В первую версию нужно включить:
+```text
+Telegram user
+    │
+    ▼
+Telegram bot ── internal HTTP ──▶ FastAPI
+                                  │
+                                  ├── SQLAlchemy ──▶ PostgreSQL
+                                  ├── embeddings/search ──▶ Qdrant
+                                  ├── rate limits ──▶ Redis
+                                  └── OpenAI-compatible LLM provider
+```
 
-- FastAPI backend;
-- парсинг PDF через PyMuPDF;
-- recursive chunking с overlap;
-- embeddings через `sentence-transformers`;
-- хранение векторов в Qdrant;
-- retrieval по конкретному документу через `document_id`;
-- генерацию ответа через интерфейс `LLMProvider`;
-- verifier agent с LLM-based и rule-based проверками;
-- citations с metadata по страницам и чанкам;
-- запуск через Docker Compose;
-- pytest-тесты для ключевых сервисов.
+RAG-сценарий:
 
-PostgreSQL, Streamlit UI, hybrid search, reranking, Ollama support и RAG evaluation можно добавить после того, как заработает основной pipeline.
+```text
+PDF upload
+  -> text extraction
+  -> chunking
+  -> embeddings
+  -> Qdrant indexing
 
-### Этап 1: Backend Skeleton
+question
+  -> ownership check
+  -> semantic retrieval
+  -> answer generation
+  -> answer verification
+  -> QA history
+```
 
-Собрать базовую структуру проекта:
+В Docker Compose API, bot, PostgreSQL, Redis и Qdrant находятся во внутренней
+сети. API не публикуется на хост; пользовательский интерфейс MVP — Telegram-бот.
 
-- `app/main.py`;
-- API routers;
-- config module;
-- schemas;
-- services package;
-- health endpoint;
-- pytest setup;
-- Dockerfile;
-- `docker-compose.yml`.
+## Локальный запуск через Docker Compose
 
-Ожидаемый результат:
+Создайте `.env`:
 
-- `GET /health` возвращает статус сервиса;
-- проект запускается локально;
-- проект запускается через Docker Compose.
+```bash
+cp .env.example .env
+```
 
-### Этап 2: PDF Ingestion
+Замените placeholder-значения:
 
-Реализовать загрузку документа и извлечение текста:
+```env
+DATABASE_URL=postgresql+asyncpg://rag_user:replace-with-db-password@postgres:5432/rag
+INTERNAL_API_KEY=replace-with-a-long-random-internal-secret
+TELEGRAM_BOT_TOKEN=replace-with-your-telegram-bot-token
+EMBEDDING_API_KEY=replace-with-your-api-key
+LLM_API_KEY=replace-with-your-api-key
+POSTGRES_DB=rag
+POSTGRES_USER=rag_user
+POSTGRES_PASSWORD=replace-with-db-password
+POSTGRES_PORT=5432
+```
 
-- `POST /documents/upload`;
-- проверка, что загруженный файл является PDF;
-- извлечение текста постранично через PyMuPDF;
-- сохранение номеров страниц;
-- создание metadata документа;
-- возврат `document_id`, filename, status и page count.
+В `.env` значение `DATABASE_URL` рассчитано на Docker Compose, поэтому host базы
+данных — `postgres`. Для локального запуска тестов используется отдельный
+`.env.test`, где database URL указывает на `localhost`.
 
-Ожидаемый результат:
+Если используется не OpenAI напрямую, добавьте OpenAI-compatible endpoints и модель:
 
-- пользователь может загрузить PDF;
-- backend извлекает текст с page metadata;
-- пустые или нечитаемые PDF обрабатываются корректно.
+```env
+EMBEDDING_BASE_URL=https://your-embedding-provider/v1
+LLM_BASE_URL=https://your-llm-provider/v1
+LLM_MODEL=gpt-4o-mini
+```
 
-### Этап 3: Chunking
+Для медленных LLM-провайдеров полезно увеличить timeout:
 
-Реализовать recursive chunking:
+```env
+LLM_TIMEOUT_SECONDS=60
+LLM_MAX_RETRIES=1
+```
 
-- разбиение текста по разделам, абзацам, предложениям и лимиту размера;
-- overlap между соседними чанками;
-- сохранение `document_id`, `page`, `chunk_id`, `text` и `source`;
-- тесты на размер чанков, overlap и сохранение metadata.
+Первый запуск:
 
-Ожидаемый результат:
+```bash
+docker compose up --build -d postgres redis qdrant
+docker compose run --rm api alembic upgrade head
+docker compose up -d api telegram-bot
+docker compose logs -f api
+```
 
-- извлеченный текст PDF превращается в searchable chunks;
-- каждый chunk можно связать с конкретной страницей документа.
+При следующих запусках, если миграции не менялись:
 
-### Этап 4: Embeddings и Qdrant
+```bash
+docker compose up --build -d
+```
 
-Добавить vector indexing:
+## API
 
-- создать интерфейс `EmbeddingProvider`;
-- реализовать `SentenceTransformerEmbedder`;
-- позже добавить optional OpenAI-compatible embedder;
-- создать Qdrant collection;
-- сохранять chunk vectors вместе с payload metadata;
-- фильтровать vectors по `document_id`.
+API рассчитан на доверенного клиента внутри инфраструктуры. Запросы требуют:
 
-Ожидаемый результат:
+```text
+X-Internal-Api-Key: <INTERNAL_API_KEY>
+X-Telegram-User-Id: <telegram user id>
+X-Telegram-Username: <optional username>
+```
 
-- чанки загруженного документа превращаются в embeddings;
-- vectors сохраняются в Qdrant;
-- payload содержит metadata для citations.
+| Method | Route | Назначение |
+|---|---|---|
+| `GET` | `/health` | Healthcheck |
+| `GET` | `/documents` | Документы текущего Telegram-пользователя |
+| `POST` | `/documents/upload` | Загрузка и индексация PDF |
+| `GET` | `/documents/{document_id}` | Метаданные документа |
+| `DELETE` | `/documents/{document_id}` | Удаление документа |
+| `POST` | `/documents/search` | Поиск чанков по всем документам пользователя |
+| `POST` | `/documents/{document_id}/search` | Поиск чанков внутри документа |
+| `POST` | `/documents/ask` | Ответ по всем документам пользователя |
+| `POST` | `/documents/{document_id}/ask` | Ответ по выбранному документу |
+| `GET` | `/qa-history` | История вопросов пользователя |
 
-### Этап 5: Retrieval
+Пример ответа `/documents/{document_id}/ask`:
 
-Реализовать semantic retrieval:
+```json
+{
+  "answer": "Документ описывает FastAPI backend и Qdrant vector search.",
+  "answer_status": "answered",
+  "chunks": [
+    {
+      "id": 17,
+      "document_id": 3,
+      "page": 4,
+      "chunk_index": 12,
+      "text": "...",
+      "source": "manual.pdf"
+    }
+  ],
+  "verification_result": {
+    "verdict": "supported",
+    "unsupported_claims": [],
+    "missing_information": [],
+    "confidence": 0.92
+  }
+}
+```
 
-- преобразовать вопрос пользователя в embedding;
-- искать top-k чанков в Qdrant;
-- фильтровать результаты по `document_id`;
-- возвращать chunk text, page, chunk id, source и score.
+Если verifier находит неподтвержденное утверждение, элемент
+`unsupported_claims` содержит сам claim и короткую причину:
 
-Ожидаемый результат:
+```json
+"unsupported_claims": [
+  {
+    "claim": "Документ использует Redis как основное хранилище данных.",
+    "reason": "В найденных фрагментах Redis описан только как storage для rate limiting."
+  }
+]
+```
 
-- `POST /documents/{document_id}/ask` может находить релевантные evidence chunks;
-- retrieval отделен от answer generation и может тестироваться отдельно.
+Ошибки приложения возвращаются в едином формате:
 
-### Этап 6: Answer Agent
+```json
+{"detail": "error.<domain>.<reason>"}
+```
 
-Реализовать генерацию ответа:
+## Rate limiting
 
-- создать интерфейс `LLMProvider`;
-- реализовать первый OpenAI-compatible provider;
-- составить prompt, который требует отвечать только по контексту;
-- возвращать answer вместе с citations;
-- явно обрабатывать ситуацию недостаточного контекста.
+Rate limiting реализован через `limits` и Redis storage. В Compose Redis работает
+во внутренней сети по адресу `async+redis://redis:6379/0`, который задается в
+`docker-compose.yml`.
 
-Ожидаемый результат:
+При превышении лимита API возвращает:
 
-- пользователь получает grounded answer;
-- каждый ответ содержит citations на retrieved chunks;
-- если информации в документе недостаточно, система отказывается отвечать вместо hallucination.
+```json
+{"detail": "error.rate_limit.exceeded"}
+```
 
-### Этап 7: Verifier Agent
+со статусом `429 Too Many Requests` и заголовком `Retry-After`. Для успешных
+limited responses добавляются `X-RateLimit-Limit`, `X-RateLimit-Remaining` и
+`X-RateLimit-Reset`.
 
-Добавить verifier-шаг:
+Начальные лимиты:
 
-- передавать в verifier question, retrieved chunks, answer и citations;
-- требовать structured JSON verdict;
-- поддержать verdicts: `supported`, `partially_supported`, `unsupported`, `insufficient_context`;
-- добавить rule-based checks для пустых citations, пустого retrieval и низких retrieval scores;
-- возвращать unsupported claims и missing citations.
+| Scope | Route | Limit |
+|---|---|---|
+| `document_upload` | `POST /documents/upload` | `10 per hour` |
+| `document_search` | `POST /documents/search`, `POST /documents/{document_id}/search` | `120 per hour` |
+| `document_ask` | `POST /documents/ask`, `POST /documents/{document_id}/ask` | `60 per hour` |
+| `qa_history_read` | `GET /qa-history` | `120 per hour` |
 
-Ожидаемый результат:
+## Разработка
 
-- final response содержит verification verdict;
-- неподтвержденные или слабо подтвержденные ответы помечаются явно;
-- verifier становится главной отличительной фичей проекта.
+Установка всех runtime и dev-зависимостей:
 
-### Этап 8: Завершение API
+```bash
+uv sync --all-extras --all-groups
+```
 
-Довести основные endpoints:
+Установка только backend-зависимостей:
 
-- `POST /documents/upload`;
-- `POST /documents/{document_id}/ask`;
-- `GET /documents`;
-- `GET /documents/{document_id}/chunks`;
-- `GET /health`.
+```bash
+uv sync --extra api
+```
 
-Ожидаемый результат:
+Установка только Telegram bot-зависимостей:
 
-- проект можно тестировать через Swagger UI;
-- основные пользовательские сценарии работают без отдельного frontend.
+```bash
+uv sync --extra bot
+```
 
-### Этап 9: Тесты
+Основные директории:
 
-Добавить focused test coverage:
+```text
+src/agentic_rag/api/          FastAPI entrypoint, routers, presenters и dependencies
+src/agentic_rag/bot/          aiogram bot, backend client и форматирование сообщений
+src/agentic_rag/core/         settings, logging, shared errors и enum-ы
+src/agentic_rag/db/           SQLAlchemy base/session
+src/agentic_rag/middleware/   request logging middleware
+src/agentic_rag/models/       SQLAlchemy-модели
+src/agentic_rag/repositories/ запросы к PostgreSQL
+src/agentic_rag/services/     PDF, chunking, indexing, retrieval, answer и verification
+src/agentic_rag/vectorstores/ Qdrant adapter
+alembic/                      миграции
+tests/                        unit, API, component и integration tests
+```
 
-- поведение chunking;
-- edge cases при PDF extraction;
-- фильтрация retrieval по документу;
-- rule-based checks verifier-а;
-- API health и validation tests.
+Создание и применение миграции:
 
-Ожидаемый результат:
+```bash
+uv run alembic revision --autogenerate -m "describe schema change"
+uv run alembic upgrade head
+```
 
-- core logic покрыта pytest-тестами;
-- регрессии в chunking, retrieval и verification проще ловить.
+Применение миграции в Docker Compose:
 
-### Этап 10: Документация и Demo
+```bash
+docker compose run --rm api alembic upgrade head
+```
 
-Улучшить презентацию проекта:
+## Тесты и проверки
 
-- architecture diagram;
-- описание agentic workflow;
-- примеры API endpoints;
-- пример request и response;
-- раздел про verification logic;
-- инструкции запуска через Docker Compose;
-- limitations и future improvements.
+Тесты используют отдельную PostgreSQL-базу `rag_test` в том же
+PostgreSQL-контейнере. Не указывайте в `.env.test` основную БД `rag`:
+фикстуры тестов очищают таблицы перед каждым тестом. Пользователь, пароль и
+внешний порт в `DATABASE_URL` из `.env.test` должны соответствовать
+`POSTGRES_USER`, `POSTGRES_PASSWORD` и `POSTGRES_PORT` в `.env`.
 
-Ожидаемый результат:
+В `.env.test` rate limiting выключен через `RATE_LIMIT_ENABLED=false`, чтобы
+обычный test suite не зависел от Redis. Rate-limit wiring тестируется отдельно
+через FastAPI dependency overrides и fake service.
 
-- GitHub README понятно объясняет, почему это не обычный PDF chatbot;
-- проект легко запустить и оценить.
+```bash
+cp .env.test.example .env.test
+docker compose up -d postgres
+docker compose exec postgres psql -U rag_user -d rag \
+  -c "CREATE DATABASE rag_test;"
+ENV_FILE=.env.test uv run alembic upgrade head
+ENV_FILE=.env.test uv run pytest
+```
 
-### Future Improvements
+Статические проверки:
 
-Возможные улучшения после MVP:
+```bash
+uv run ruff format --check .
+uv run ruff check .
+uv run mypy src tests
+```
 
-- PostgreSQL для document metadata и QA logs;
-- Streamlit demo UI;
-- Ollama provider для локального LLM inference;
-- OpenAI embeddings provider;
-- hybrid search с BM25 и vector retrieval;
-- reranker для улучшения выбора контекста;
+## Ограничения MVP
+
+- OCR для сканированных PDF не реализован;
+- indexing выполняется синхронно во время upload;
+- hybrid search, BM25 и reranking не добавлены;
+- API не имеет публичной пользовательской аутентификации: текущий клиент — Telegram bot;
+
+## Возможные улучшения
+
+- background indexing через worker queue;
+- OCR для scanned PDFs;
+- retrieval score threshold и reranking;
+- hybrid search;
+- web frontend;
 - RAG evaluation через RAGAS, DeepEval или TruLens;
-- OCR support для scanned PDFs;
-- user accounts и document permissions;
-- async background indexing для больших документов.
-
-### Рекомендуемый порядок реализации
-
-1. Backend skeleton.
-2. PDF ingestion.
-3. Chunking.
-4. Embeddings и Qdrant indexing.
-5. Retrieval.
-6. Answer agent.
-7. Verifier agent.
-8. API cleanup.
-9. Tests.
-10. Documentation и demo examples.
+- observability через OpenTelemetry или Langfuse.

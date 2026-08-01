@@ -5,7 +5,7 @@ from typing import TypeVar
 import httpx
 from pydantic import BaseModel, TypeAdapter
 
-from agentic_rag.models import AnswerStatus, DocumentStatus, VerificationVerdict
+from agentic_rag.core.enums import AnswerStatus, DocumentStatus, VerificationVerdict
 
 ResponseT = TypeVar("ResponseT")
 
