@@ -70,23 +70,16 @@ question
 cp .env.example .env
 ```
 
-Замените placeholder-значения:
+Замените placeholder-значения.
 
-```env
-DATABASE_URL=postgresql+asyncpg://rag_user:replace-with-db-password@postgres:5432/rag
-INTERNAL_API_KEY=replace-with-a-long-random-internal-secret
-TELEGRAM_BOT_TOKEN=replace-with-your-telegram-bot-token
-EMBEDDING_API_KEY=replace-with-your-api-key
-LLM_API_KEY=replace-with-your-api-key
-POSTGRES_DB=rag
-POSTGRES_USER=rag_user
-POSTGRES_PASSWORD=replace-with-db-password
-POSTGRES_PORT=5432
-```
+Для Docker Compose `DATABASE_URL` не задается в `.env` вручную:
+`docker-compose.yml` собирает его из `POSTGRES_DB`, `POSTGRES_USER` и
+`POSTGRES_PASSWORD` и передает в контейнер `api`. Внутри Docker-сети API и
+миграции подключаются к PostgreSQL по адресу `postgres:5432`.
 
-В `.env` значение `DATABASE_URL` рассчитано на Docker Compose, поэтому host базы
-данных — `postgres`. Для локального запуска тестов используется отдельный
-`.env.test`, где database URL указывает на `localhost`.
+`POSTGRES_PORT` — это внешний порт для подключения к PostgreSQL с хоста.
+Для локального запуска тестов используется отдельный `.env.test`, где
+`DATABASE_URL` указывает на `localhost` и этот внешний порт.
 
 Если используется не OpenAI напрямую, добавьте OpenAI-compatible endpoints и модель:
 
@@ -106,9 +99,9 @@ LLM_MAX_RETRIES=1
 Первый запуск:
 
 ```bash
-docker compose up --build -d postgres redis qdrant
-docker compose run --rm api alembic upgrade head
-docker compose up -d api telegram-bot
+docker compose up -d postgres redis qdrant
+docker compose run --rm --build api alembic upgrade head
+docker compose up -d --build api telegram-bot
 docker compose logs -f api
 ```
 
@@ -245,17 +238,29 @@ alembic/                      миграции
 tests/                        unit, API, component и integration tests
 ```
 
-Создание и применение миграции:
+Создание миграции. В `DATABASE_URL` используйте пользователя, пароль и внешний
+порт PostgreSQL из `.env`:
 
 ```bash
-uv run alembic revision --autogenerate -m "describe schema change"
-uv run alembic upgrade head
+DATABASE_URL=postgresql+asyncpg://rag_user:replace-with-db-password@localhost:5432/rag \
+  uv run alembic revision --autogenerate -m "describe schema change"
 ```
 
-Применение миграции в Docker Compose:
+Применение миграций для Docker Compose выполняется внутри контейнера `api`.
+Compose собирает `DATABASE_URL` для контейнера из PostgreSQL-переменных в
+`.env`. Перед применением миграций image `api` пересобирается, потому что
+файлы из `alembic/` копируются в контейнер на этапе сборки. Команда запускает
+одноразовый контейнер для Alembic и не пересоздает уже работающий сервис `api`:
 
 ```bash
-docker compose run --rm api alembic upgrade head
+docker compose run --rm --build api alembic upgrade head
+```
+
+Если `api` уже был запущен, после применения миграций пересоздайте сервисы на
+свежем image:
+
+```bash
+docker compose up -d --build api telegram-bot
 ```
 
 ## Тесты и проверки

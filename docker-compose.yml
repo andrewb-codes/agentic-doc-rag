@@ -50,6 +50,7 @@ services:
     env_file:
       - .env
     environment:
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
       QDRANT_URL: "http://qdrant:6333"
       RATE_LIMIT_REDIS_URL: "async+redis://redis:6379/0"
     depends_on:

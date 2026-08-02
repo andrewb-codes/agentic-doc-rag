@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
+      INTERNAL_API_KEY: test
+      EMBEDDING_API_KEY: test
+      LLM_API_KEY: test
+      RATE_LIMIT_ENABLED: false
+      BACKEND_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.2.0
+
+      - name: Install dependencies
+        run: uv sync --all-extras --group dev --locked
+
+      - name: Apply migrations
+        run: uv run alembic upgrade head
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Run ruff
+        run: uv run ruff check .
+
+      - name: Run mypy
+        run: uv run mypy src tests
+
+      - name: Run tests
+        run: uv run pytest
