@@ -1,0 +1,35 @@
+app_dir: /opt/apps/rag
+
+api_image: ghcr.io/andrewb-codes/agentic-doc-rag-api
+bot_image: ghcr.io/andrewb-codes/agentic-doc-rag-bot
+app_image_tag: main
+
+api_image_ref: "{{ api_image }}:{{ app_image_tag }}"
+bot_image_ref: "{{ bot_image }}:{{ app_image_tag }}"
+
+postgres_image: mirror.gcr.io/library/postgres:17
+redis_image: mirror.gcr.io/library/redis:7.4-alpine
+qdrant_image: qdrant/qdrant:v1.18.0
+
+app_env:
+  ENVIRONMENT: production
+  LOG_FORMAT: json
+
+  INTERNAL_API_KEY: "{{ internal_api_key }}"
+
+  TELEGRAM_BOT_TOKEN: "{{ telegram_bot_token }}"
+
+  EMBEDDING_API_KEY: "{{ embedding_api_key }}"
+  EMBEDDING_BASE_URL: "{{ embedding_base_url }}"
+
+  LLM_API_KEY: "{{ llm_api_key }}"
+  LLM_BASE_URL: "{{ llm_base_url }}"
+
+  LLM_MODEL: gpt-5.5
+
+  RATE_LIMIT_ENABLED: "true"
+
+  POSTGRES_DB: rag
+  POSTGRES_USER: rag_user
+  POSTGRES_PASSWORD: "{{ postgres_password }}"
+  POSTGRES_PASSWORD_URLENCODED: "{{ postgres_password | urlencode }}"

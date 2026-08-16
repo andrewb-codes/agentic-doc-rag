@@ -1,0 +1,159 @@
+- name: Deploy Rag
+  hosts: portfolio
+  become: true
+
+  handlers:
+    - name: Restart docker
+      ansible.builtin.service:
+        name: docker
+        state: restarted
+
+  tasks:
+    - name: Install base packages
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - python3-debian
+        state: present
+        update_cache: true
+
+    - name: Create Docker apt key directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Install Docker apt key
+      ansible.builtin.get_url:
+        url: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}/gpg"
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Configure Docker apt repository
+      ansible.builtin.deb822_repository:
+        name: docker
+        types:
+          - deb
+        uris:
+          - "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}"
+        suites:
+          - "{{ ansible_facts['distribution_release'] }}"
+        components:
+          - stable
+        architectures:
+          - "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture'] }}"
+        signed_by: /etc/apt/keyrings/docker.asc
+        state: present
+
+    - name: Install Docker Engine and Compose plugin
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+      notify: Restart docker
+
+    - name: Enable Docker service
+      ansible.builtin.service:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Prune unused Docker data before deployment
+      ansible.builtin.command:
+        cmd: docker system prune -af
+      changed_when: false
+
+    - name: Create application directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Render production environment file
+      ansible.builtin.template:
+        src: env.j2
+        dest: "{{ app_dir }}/.env"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0600"
+
+    - name: Render production Docker Compose file
+      ansible.builtin.template:
+        src: docker-compose.prod.yml.j2
+        dest: "{{ app_dir }}/docker-compose.prod.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0644"
+
+    - name: Pull PostgreSQL image if missing
+      ansible.builtin.command:
+        cmd: "docker image inspect {{ postgres_image }}"
+      register: postgres_image_check
+      changed_when: false
+      failed_when: false
+
+    - name: Pull PostgreSQL image
+      ansible.builtin.command:
+        cmd: "docker pull {{ postgres_image }}"
+      when: postgres_image_check.rc != 0
+      changed_when: true
+
+    - name: Pull Redis image if missing
+      ansible.builtin.command:
+        cmd: "docker image inspect {{ redis_image }}"
+      register: redis_image_check
+      changed_when: false
+      failed_when: false
+
+    - name: Pull Redis image
+      ansible.builtin.command:
+        cmd: "docker pull {{ redis_image }}"
+      when: redis_image_check.rc != 0
+      changed_when: true
+
+    - name: Pull API and bot images
+      ansible.builtin.command:
+        cmd: docker compose -f docker-compose.prod.yml pull api bot
+        chdir: "{{ app_dir }}"
+      changed_when: true
+
+    - name: Start infrastructure services
+      ansible.builtin.command:
+        cmd: docker compose -f docker-compose.prod.yml up -d postgres redis qdrant
+        chdir: "{{ app_dir }}"
+      changed_when: true
+
+    - name: Run Alembic migrations
+      ansible.builtin.command:
+        cmd: docker compose -f docker-compose.prod.yml run --rm api alembic upgrade head
+        chdir: "{{ app_dir }}"
+      changed_when: true
+
+    - name: Start application services
+      ansible.builtin.command:
+        cmd: docker compose -f docker-compose.prod.yml up -d api bot
+        chdir: "{{ app_dir }}"
+      changed_when: true
+
+    - name: Prune replaced Docker data after deployment
+      ansible.builtin.command:
+        cmd: docker system prune -af
+      changed_when: false
+
+    - name: Show service status
+      ansible.builtin.command:
+        cmd: docker compose -f docker-compose.prod.yml ps
+        chdir: "{{ app_dir }}"
+      register: compose_ps
+      changed_when: false
+
+    - name: Print service status
+      ansible.builtin.debug:
+        var: compose_ps.stdout_lines

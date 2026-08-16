@@ -1,0 +1,8 @@
+internal_api_key: replace-with-a-long-random-secret
+telegram_bot_token: replace-with-your-bot-token
+embedding_api_key: replace-with-your-api-key
+embedding_base_url: replace-with-your-base-url
+llm_api_key: replace-with-your-api-key
+llm_base_url: replace-with-your-base-url
+postgres_password: replace-with-a-long-random-password
+

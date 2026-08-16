@@ -59,6 +59,7 @@ qdrant-data/
 
 # Project files not needed in runtime images
 tests/
+deploy/
 
 # IDEs and OS files
 .idea/
