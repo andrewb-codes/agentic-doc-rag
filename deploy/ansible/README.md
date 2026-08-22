@@ -10,7 +10,7 @@ API/Bot images из GHCR и запускает пять сервисов чер�
 - `bot` — Telegram bot клиент.
 
 Bot обращается к API по адресу `http://api:8000`.
-API, PostgreSQL, Redis и Qdrant снаружи не публикуются.
+Bot, API, PostgreSQL, Redis и Qdrant снаружи не публикуются.
 
 ## Конфигурация
 
@@ -34,10 +34,9 @@ redis_image: mirror.gcr.io/library/redis:7.4-alpine
 qdrant_image: qdrant/qdrant:v1.18.0
 ```
 
-PostgreSQL, Redis и Qdrant используют зеркало Docker Hub official images, чтобы VPS не
+PostgreSQL и Redis используют зеркало Docker Hub official images, чтобы VPS не
 упирался в anonymous pull rate limit Docker Hub. При необходимости эти значения
-можно заменить на `postgres:17`, `redis:7.4-alpine` и `qdrant/qdrant:v1.18.0` 
-или на образы из своего registry.
+можно заменить на `postgres:17` и `redis:7.4-alpine` или на образы из своего registry.
 
 ## Что делает playbook
 

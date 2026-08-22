@@ -19,7 +19,7 @@ Backend и Telegram-бот для вопросно-ответного поиск
 - Telegram UI для загрузки, выбора и удаления документов;
 - rate limiting через Redis;
 - структурированное логирование запросов с `X-Request-ID`;
-- Docker Compose для API, bot, PostgreSQL, Redis и Qdrant;
+- Docker Compose для API, Bot, PostgreSQL, Redis и Qdrant;
 - pytest-покрытие сервисов, API, repositories, rate limiting и Telegram client.
 
 Основной стек: Python 3.13, FastAPI, aiogram 3, SQLAlchemy 2 async, PostgreSQL,
@@ -291,6 +291,14 @@ uv run ruff format --check .
 uv run ruff check .
 uv run mypy src tests
 ```
+
+## Деплой
+
+GitHub Actions при push в `main` собирает API и Bot images, публикует их в 
+GHCR и запускает Ansible playbook. Bot, API, PostgreSQL, Redis и Qdrant остаются во внутренней сети.
+
+Настройка GitHub Variables, Secrets, Vault, ручной запуск и эксплуатационные 
+команды описаны в [deploy/ansible/README.md](deploy/ansible/README.md).
 
 ## Ограничения MVP
 
